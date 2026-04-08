@@ -32,6 +32,7 @@ def db_session():
     TestingSession = sessionmaker(bind=_engine)
     session = TestingSession()
     yield session
+    session.rollback()
     session.close()
     Base.metadata.drop_all(_engine)
     _engine.dispose()
@@ -123,6 +124,13 @@ def test_login_wrong_password(client, seeded_db):
 
 def test_login_unknown_nuid(client, seeded_db):
     response = client.post("/auth/login", json={"nuid": "99999999", "password": "x"})
+    assert response.status_code == 401
+
+
+def test_login_inactive_user(client, seeded_db, db_session):
+    seeded_db["user"].is_active = False
+    db_session.commit()
+    response = client.post("/auth/login", json={"nuid": "11111111", "password": "testpass"})
     assert response.status_code == 401
 
 

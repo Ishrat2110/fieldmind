@@ -7,6 +7,7 @@ Run with: python3 api.py  (starts on http://localhost:8000)
 import os
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import TypedDict
 
 import uvicorn
@@ -23,10 +24,8 @@ from models import (
 from werkzeug.security import check_password_hash
 
 # ── DB ────────────────────────────────────────────────────────────────────────
-DATABASE_URL = os.environ.get(
-    "DATABASE_URL",
-    "sqlite:////Users/ishratjandu/AI_Pitla/results/farm_manager.db"
-)
+_DEFAULT_DB = Path(__file__).parent.parent / "results" / "farm_manager.db"
+DATABASE_URL = os.environ.get("DATABASE_URL", f"sqlite:///{_DEFAULT_DB}")
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(bind=engine)
 
@@ -38,7 +37,7 @@ FARM_ID = 1
 class SessionUser(TypedDict):
     user_id: int
     name: str
-    session_id: str
+    session_id: str  # stored for future audit log correlation; not yet used by endpoints
 
 # In-memory: token -> SessionUser; cleared on process restart (tab-session contract)
 sessions: dict[str, SessionUser] = {}
