@@ -144,3 +144,71 @@ def test_logout(client, seeded_db):
     # Try to log out again with same token - should get 401
     response2 = client.post("/auth/logout", headers={"Authorization": f"Bearer {token}"})
     assert response2.status_code == 401
+
+
+# ── HELPER: get auth token ─────────────────────────────────────────────────────
+def auth_headers(client, nuid="11111111", password="testpass"):
+    r = client.post("/auth/login", json={"nuid": nuid, "password": password})
+    return {"Authorization": f"Bearer {r.json()['token']}"}
+
+
+# ── INVENTORY ─────────────────────────────────────────────────────────────────
+def test_get_inventory_all(client, seeded_db):
+    headers = auth_headers(client)
+    r = client.get("/api/inventory", headers=headers)
+    assert r.status_code == 200
+    items = r.json()
+    assert len(items) >= 1
+    assert items[0]["name"] == "Test Herbicide"
+
+
+def test_get_inventory_filter_category(client, seeded_db):
+    headers = auth_headers(client)
+    r = client.get("/api/inventory?category=herbicide", headers=headers)
+    assert r.status_code == 200
+    assert all(i["category"] == "herbicide" for i in r.json())
+
+
+def test_get_inventory_search(client, seeded_db):
+    headers = auth_headers(client)
+    r = client.get("/api/inventory?search=herb", headers=headers)
+    assert r.status_code == 200
+    assert any("Herbicide" in i["name"] for i in r.json())
+
+
+# ── FIELDS ────────────────────────────────────────────────────────────────────
+def test_get_fields(client, seeded_db):
+    headers = auth_headers(client)
+    r = client.get("/api/fields", headers=headers)
+    assert r.status_code == 200
+    fields = r.json()
+    assert len(fields) == 1
+    assert fields[0]["name"] == "Field A"
+
+
+# ── PLOTS ─────────────────────────────────────────────────────────────────────
+def test_get_plots_for_field(client, seeded_db):
+    headers = auth_headers(client)
+    field_id = seeded_db["field"].id
+    r = client.get(f"/api/plots?field_id={field_id}", headers=headers)
+    assert r.status_code == 200
+    plots = r.json()
+    assert len(plots) == 1
+    assert plots[0]["plot_code"] == "A-01"
+    assert plots[0]["area_ha"] == 2.5
+
+
+# ── EQUIPMENT ─────────────────────────────────────────────────────────────────
+def test_get_equipment(client, seeded_db):
+    headers = auth_headers(client)
+    r = client.get("/api/equipment", headers=headers)
+    assert r.status_code == 200
+    equip = r.json()
+    assert len(equip) == 1
+    assert equip[0]["chemical_rate_l_per_ha"] == 150.0
+
+
+# ── PROTECTED ENDPOINT WITHOUT TOKEN ──────────────────────────────────────────
+def test_protected_endpoint_without_token(client, seeded_db):
+    response = client.get("/api/fields")
+    assert response.status_code == 422  # missing required Authorization header

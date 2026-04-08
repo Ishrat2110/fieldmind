@@ -8,7 +8,7 @@ import os
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TypedDict
+from typing import Optional, TypedDict
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Depends, Header
@@ -102,6 +102,72 @@ def logout(authorization: str = Header(...), current_user: SessionUser = Depends
     token = authorization.removeprefix("Bearer ").strip()
     sessions.pop(token, None)
     return {"status": "logged out"}
+
+
+# ── READ ENDPOINTS ────────────────────────────────────────────────────────────
+
+@app.get("/api/inventory")
+def get_inventory(
+    category: Optional[str] = None,
+    search: Optional[str] = None,
+    current_user: SessionUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    q = db.query(InventoryItem).filter_by(farm_id=FARM_ID)
+    if category:
+        q = q.filter(InventoryItem.category == category.lower())
+    if search:
+        q = q.filter(InventoryItem.name.ilike(f"%{search}%"))
+    items = q.order_by(InventoryItem.name).all()
+    return [
+        {
+            "id": i.id,
+            "name": i.name,
+            "category": i.category,
+            "unit": i.unit,
+            "quantity_on_hand": i.quantity_on_hand,
+        }
+        for i in items
+    ]
+
+
+@app.get("/api/fields")
+def get_fields(
+    current_user: SessionUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    fields = db.query(Field).filter_by(farm_id=FARM_ID).order_by(Field.name).all()
+    return [{"id": f.id, "name": f.name, "area_ha": f.area_ha} for f in fields]
+
+
+@app.get("/api/plots")
+def get_plots(
+    field_id: int,
+    current_user: SessionUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    plots = db.query(Plot).filter_by(field_id=field_id).order_by(Plot.plot_code).all()
+    return [
+        {"id": p.id, "plot_code": p.plot_code, "area_ha": p.area_ha, "replication": p.replication}
+        for p in plots
+    ]
+
+
+@app.get("/api/equipment")
+def get_equipment(
+    current_user: SessionUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    equip = db.query(Equipment).filter_by(farm_id=FARM_ID).all()
+    return [
+        {
+            "id": e.id,
+            "name": e.name,
+            "equipment_type": e.equipment_type,
+            "chemical_rate_l_per_ha": e.chemical_rate_l_per_ha,
+        }
+        for e in equip
+    ]
 
 
 if __name__ == "__main__":
