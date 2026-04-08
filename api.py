@@ -24,7 +24,7 @@ from models import (
 from werkzeug.security import check_password_hash
 
 # ── DB ────────────────────────────────────────────────────────────────────────
-_DEFAULT_DB = Path(__file__).parent.parent / "results" / "farm_manager.db"
+_DEFAULT_DB = Path(__file__).parent.parent.parent / "results" / "farm_manager.db"
 DATABASE_URL = os.environ.get("DATABASE_URL", f"sqlite:///{_DEFAULT_DB}")
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(bind=engine)
