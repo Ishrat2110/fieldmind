@@ -1,0 +1,1188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FarmOS — Precision Farm Management</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Albert+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+  <style>
+    *, ::before, ::after { box-sizing: border-box; margin: 0; padding: 0; border: 0; font: inherit; vertical-align: baseline; outline: 0; }
+
+    :root {
+      --bg:       #080d10;
+      --bg2:      #0c1216;
+      --surface:  #111820;
+      --border:   rgba(255,255,255,0.07);
+      --orange:   #F55014;
+      --orange-h: #d94410;
+      --white:    #ffffff;
+      --t1:       rgba(255,255,255,0.92);
+      --t2:       rgba(255,255,255,0.55);
+      --t3:       rgba(255,255,255,0.32);
+      --green:    #22c55e;
+      --green-bg: rgba(34,197,94,0.1);
+      --amber:    #f59e0b;
+      --amber-bg: rgba(245,158,11,0.1);
+      --red:      #ef4444;
+      --red-bg:   rgba(239,68,68,0.1);
+      --sidebar-w: 240px;
+    }
+
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Albert Sans', Arial, sans-serif; background: var(--bg); color: var(--t1); line-height: 1.5; min-height: 100vh; -ms-overflow-style: none; scrollbar-width: none; }
+    body::-webkit-scrollbar { display: none; }
+
+    body::after {
+      content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 9999; opacity: 0.022;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+
+    /* ─────────────────────────────────────────
+       ROUTING — pages hidden/shown via JS
+    ───────────────────────────────────────── */
+    .page { display: none; }
+    .page.active { display: block; }
+
+    /* ─────────────────────────────────────────
+       SIDEBAR
+    ───────────────────────────────────────── */
+    #sidebar {
+      position: fixed; top: 0; left: 0; bottom: 0; width: var(--sidebar-w);
+      background: #060b0e; border-right: 1px solid var(--border);
+      display: none; flex-direction: column; z-index: 200;
+    }
+    #sidebar.visible { display: flex; }
+
+    .sb-logo { padding: 24px 20px 20px; border-bottom: 1px solid var(--border); }
+    .sb-logo-link { font-size: 1rem; font-weight: 700; color: var(--t1); text-decoration: none; cursor: pointer; background: none; border: none; font-family: inherit; }
+    .sb-logo-link span { color: var(--orange); }
+    .sb-farm { font-size: 0.6875rem; color: var(--t3); margin-top: 6px; line-height: 1.4; }
+
+    .sb-nav { flex: 1; padding: 12px 8px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+    .sb-section-label { font-size: 0.625rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--t3); padding: 8px 12px 4px; }
+
+    .sb-link {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 12px; border-radius: 6px;
+      font-size: 0.875rem; font-weight: 500; color: var(--t2);
+      text-decoration: none; cursor: pointer;
+      background: none; border: none; font-family: inherit; width: 100%; text-align: left;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+    .sb-link:hover { background: rgba(255,255,255,0.05); color: var(--t1); }
+    .sb-link.active { background: rgba(245,80,20,0.12); color: var(--orange); }
+    .sb-link svg { width: 16px; height: 16px; flex-shrink: 0; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+    .sb-badge { margin-left: auto; font-size: 0.625rem; font-weight: 700; background: var(--red); color: #fff; border-radius: 100px; padding: 2px 7px; }
+
+    .sb-user { padding: 16px 20px; border-top: 1px solid var(--border); }
+    .sb-user-name { font-size: 0.8125rem; font-weight: 600; color: var(--t1); }
+    .sb-user-role { font-size: 0.6875rem; color: var(--t3); margin-top: 2px; }
+
+    /* ─────────────────────────────────────────
+       APP SHELL — main area (app pages)
+    ───────────────────────────────────────── */
+    #app-shell { display: none; margin-left: var(--sidebar-w); }
+    #app-shell.visible { display: block; }
+
+    .app-main { padding: 40px 48px; }
+    .page-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 32px; }
+    .page-title { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; color: var(--white); }
+    .page-sub { font-size: 0.875rem; color: var(--t3); margin-top: 4px; }
+
+    /* ─────────────────────────────────────────
+       SHARED COMPONENTS
+    ───────────────────────────────────────── */
+
+    /* Stats strip */
+    .stats-strip { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; background: var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 32px; }
+    .stat-block { background: var(--surface); padding: 20px 24px; }
+    .stat-num { font-size: 2rem; font-weight: 700; letter-spacing: -0.03em; line-height: 1; color: var(--white); margin-bottom: 4px; }
+    .stat-num.red    { color: var(--red); }
+    .stat-num.amber  { color: var(--amber); }
+    .stat-num.green  { color: var(--green); }
+    .stat-num.orange { color: var(--orange); }
+    .stat-lbl    { font-size: 0.8125rem; font-weight: 600; color: var(--t2); margin-bottom: 2px; }
+    .stat-detail { font-size: 0.6875rem; color: var(--t3); }
+
+    /* Stat row (4-col) */
+    .stat-row4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; background: var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 32px; }
+    .stat-card { background: var(--surface); padding: 20px 24px; }
+    .stat-label { font-size: 0.75rem; color: var(--t3); margin-bottom: 6px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; }
+    .stat-value { font-size: 2rem; font-weight: 700; letter-spacing: -0.03em; color: var(--white); }
+    .stat-value.red   { color: var(--red);   }
+    .stat-value.amber { color: var(--amber); }
+    .stat-value.green { color: var(--green); }
+    .stat-sub { font-size: 0.6875rem; color: var(--t3); margin-top: 3px; }
+
+    /* Grid layouts */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; }
+    .grid-wide { display: grid; grid-template-columns: 2fr 1fr; gap: 24px; margin-bottom: 24px; }
+
+    /* Card */
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 24px; }
+    .card-head { display: flex; align-items: center; justify-content: space-between; padding: 18px 24px; border-bottom: 1px solid var(--border); }
+    .card-title { font-size: 0.9375rem; font-weight: 600; color: var(--t1); }
+    .card-link { font-size: 0.8125rem; color: var(--orange); text-decoration: none; cursor: pointer; background: none; border: none; font-family: inherit; }
+    .card-link:hover { color: var(--orange-h); }
+    .card-sub { font-size: 0.75rem; color: var(--t3); }
+
+    /* Alert row */
+    .alert-row { display: flex; align-items: center; gap: 14px; padding: 14px 24px; border-bottom: 1px solid var(--border); }
+    .alert-row:last-child { border-bottom: none; }
+    .alert-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .dot-red   { background: var(--red); }
+    .dot-amber { background: var(--amber); }
+    .dot-green { background: var(--green); }
+    .dot-blue  { background: #60a5fa; }
+    .alert-body { flex: 1; min-width: 0; }
+    .alert-title { font-size: 0.875rem; font-weight: 600; color: var(--t1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .alert-sub   { font-size: 0.75rem; color: var(--t3); margin-top: 2px; }
+
+    /* Badges */
+    .badge { display: inline-block; font-size: 0.625rem; font-weight: 700; padding: 3px 9px; border-radius: 100px; flex-shrink: 0; }
+    .badge-red    { background: var(--red-bg);   color: var(--red);   }
+    .badge-amber  { background: var(--amber-bg); color: var(--amber); }
+    .badge-green  { background: var(--green-bg); color: var(--green); }
+    .badge-orange { background: rgba(245,80,20,0.12); color: var(--orange); }
+    .badge-blue   { background: rgba(96,165,250,0.1); color: #60a5fa; }
+    .badge-purple { background: rgba(167,139,250,0.1); color: #a78bfa; }
+
+    /* Bar */
+    .bar-track { height: 5px; background: rgba(255,255,255,0.07); border-radius: 3px; overflow: hidden; }
+    .bar-fill  { height: 100%; border-radius: 3px; }
+    .bar-wrap  { display: flex; flex-direction: column; gap: 4px; }
+    .bar-labels { display: flex; justify-content: space-between; }
+    .bar-lbl { font-size: 0.625rem; color: var(--t3); }
+
+    /* Activity row */
+    .activity-row { display: flex; align-items: flex-start; gap: 12px; padding: 12px 24px; border-bottom: 1px solid var(--border); }
+    .activity-row:last-child { border-bottom: none; }
+    .activity-date { font-size: 0.6875rem; color: var(--t3); width: 54px; flex-shrink: 0; padding-top: 2px; }
+    .activity-text { font-size: 0.8125rem; color: var(--t2); line-height: 1.5; }
+    .activity-text strong { color: var(--t1); font-weight: 600; }
+
+    /* Inventory row */
+    .inv-row { display: grid; align-items: center; grid-template-columns: 160px 1fr 90px 60px; gap: 12px; padding: 12px 24px; border-bottom: 1px solid var(--border); }
+    .inv-row:last-child { border-bottom: none; }
+    .inv-name { font-size: 0.8125rem; font-weight: 600; color: var(--t1); }
+    .inv-cat  { font-size: 0.6875rem; color: var(--t3); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 2px; }
+    .inv-qty  { font-size: 0.75rem; color: var(--t2); text-align: right; }
+
+    /* Buttons */
+    .btn { display: inline-flex; align-items: center; gap: 6px; font-family: 'Albert Sans', sans-serif; font-size: 0.8125rem; font-weight: 500; padding: 8px 16px; border-radius: 6px; border: 1px solid var(--border); cursor: pointer; text-decoration: none; color: var(--t2); background: transparent; transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.1s ease; }
+    .btn:hover { color: var(--t1); border-color: rgba(255,255,255,0.15); }
+    .btn-orange { background: var(--orange); color: #fff !important; border-color: transparent; }
+    .btn-orange:hover { background: var(--orange-h); }
+    .btn-ghost { background: transparent; color: var(--t2); border: 1px solid var(--border); }
+    .btn-ghost:hover { color: var(--t1); border-color: rgba(255,255,255,0.15); transform: translateY(-1px); }
+    .btn-ghost:active { transform: translateY(0); }
+
+    /* Table */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    thead th { padding: 10px 16px; text-align: left; font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--t3); border-bottom: 1px solid var(--border); background: rgba(255,255,255,0.02); }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s ease; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: rgba(255,255,255,0.025); }
+    td { padding: 12px 16px; font-size: 0.875rem; color: var(--t2); vertical-align: middle; }
+    td.bold   { color: var(--t1); font-weight: 600; }
+    td.mono   { font-family: 'Courier New', monospace; font-size: 0.8125rem; color: var(--t1); font-weight: 700; }
+    td.right  { text-align: right; }
+    td.td-red { color: var(--red); font-weight: 700; }
+    td.td-amber { color: var(--amber); }
+    td.td-green { color: var(--green); }
+    td.dim    { color: var(--t3); }
+
+    /* Stage pill */
+    .stage-pill { display: inline-flex; align-items: center; gap: 6px; font-size: 0.75rem; font-weight: 600; background: rgba(245,80,20,0.1); color: var(--orange); border: 1px solid rgba(245,80,20,0.2); padding: 3px 10px; border-radius: 100px; }
+
+    /* Filters bar */
+    .filters { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 24px; }
+    .filters select, .filters input {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+      padding: 7px 12px; font-size: 0.8125rem; color: var(--t1);
+      font-family: inherit; cursor: pointer;
+      transition: border-color 0.15s ease;
+    }
+    .filters select:hover, .filters input:hover { border-color: rgba(255,255,255,0.15); }
+    .filters select:focus, .filters input:focus { outline: none; border-color: rgba(245,80,20,0.4); }
+
+    /* Section divider */
+    .section-divider { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
+
+    /* Summary cards (4-col) */
+    .summary-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; background: var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 24px; }
+    .summary-card { background: var(--bg2); padding: 16px 20px; }
+    .summary-val { font-size: 1.375rem; font-weight: 700; color: var(--white); letter-spacing: -0.03em; }
+    .summary-val span { color: var(--orange); }
+    .summary-lbl { font-size: 0.75rem; color: var(--t3); margin-top: 3px; }
+
+    /* Field section */
+    .field-section { margin-bottom: 40px; }
+    .field-header { display: flex; align-items: flex-end; justify-content: space-between; padding: 20px 24px; background: var(--surface); border: 1px solid var(--border); border-bottom: none; border-radius: 12px 12px 0 0; }
+    .field-name { font-size: 1.0625rem; font-weight: 700; color: var(--white); letter-spacing: -0.02em; }
+    .field-meta { display: flex; gap: 16px; margin-top: 4px; flex-wrap: wrap; }
+    .field-meta span { font-size: 0.75rem; color: var(--t3); display: flex; align-items: center; gap: 5px; }
+    .field-meta svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .field-table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 0 0 12px 12px; overflow: hidden; }
+
+    /* Stock row */
+    .stock-row { display: grid; grid-template-columns: 220px 1fr 120px 100px 70px; align-items: center; gap: 16px; padding: 14px 24px; border-bottom: 1px solid var(--border); }
+    .stock-row:last-child { border-bottom: none; }
+    .stock-name { font-size: 0.875rem; font-weight: 600; color: var(--t1); }
+    .stock-cat  { font-size: 0.6875rem; color: var(--t3); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 2px; }
+    .qty-text   { font-size: 0.8125rem; color: var(--t2); text-align: right; white-space: nowrap; }
+    .days-text  { font-size: 0.75rem; color: var(--t3); text-align: right; }
+
+    /* ─────────────────────────────────────────
+       HOMEPAGE (LANDING) STYLES
+    ───────────────────────────────────────── */
+
+    /* Homepage nav */
+    #home-nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      display: none; align-items: center; justify-content: space-between;
+      padding: 22px 48px;
+      background: rgba(8,13,16,0.85); backdrop-filter: blur(16px);
+    }
+    #home-nav.visible { display: flex; }
+
+    .home-nav-logo { font-size: 0.875rem; font-weight: 700; color: var(--t1); text-decoration: none; letter-spacing: -0.01em; background: none; border: none; font-family: inherit; cursor: pointer; }
+    .home-nav-logo span { color: var(--orange); }
+    .home-nav-logo:hover { color: var(--white); }
+    .home-nav-right { display: flex; align-items: center; gap: 36px; }
+    .home-nav-links { display: flex; align-items: center; gap: 32px; list-style: none; }
+    .home-nav-links a { font-size: 0.875rem; font-weight: 400; color: var(--t2); text-decoration: none; transition: color 0.2s ease; }
+    .home-nav-links a:hover { color: var(--t1); }
+    .home-nav-cta { font-size: 0.8125rem; font-weight: 500; color: var(--white); background: var(--orange); text-decoration: none; padding: 9px 20px; border-radius: 6px; cursor: pointer; border: none; font-family: inherit; transition: background 0.2s ease, transform 0.15s ease; }
+    .home-nav-cta:hover { background: var(--orange-h); transform: translateY(-1px); }
+
+    /* Hero */
+    .hero { min-height: 100vh; display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 48px; padding: 120px 48px 80px; position: relative; overflow: hidden; }
+    .hero::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: radial-gradient(ellipse 60% 50% at 70% 50%, rgba(245,80,20,0.06) 0%, transparent 70%), radial-gradient(ellipse 40% 60% at 20% 80%, rgba(245,80,20,0.03) 0%, transparent 60%); pointer-events: none; }
+
+    .hero-left { position: relative; z-index: 1; max-width: 520px; animation: fadeUp 0.7s cubic-bezier(0.22,1,0.36,1) both; }
+    .hero-right { position: relative; z-index: 1; display: flex; justify-content: flex-end; align-items: center; animation: fadeUp 0.7s 0.15s cubic-bezier(0.22,1,0.36,1) both; }
+
+    .hero-tag { display: inline-block; font-size: 0.75rem; font-weight: 500; color: var(--orange); background: rgba(245,80,20,0.12); border: 1px solid rgba(245,80,20,0.2); padding: 6px 14px; border-radius: 100px; margin-bottom: 28px; }
+    .hero h1 { font-size: clamp(2.25rem, 4vw, 3.5rem); font-weight: 700; line-height: 1.08; letter-spacing: -0.03em; color: var(--white); margin-bottom: 24px; }
+    .hero h1 em { font-style: italic; color: var(--orange); }
+    .hero-sub { font-size: 0.9375rem; font-weight: 400; line-height: 1.7; color: var(--t2); max-width: 400px; margin-bottom: 40px; }
+    .hero-btns { display: flex; align-items: center; gap: 16px; }
+
+    /* Hero card */
+    .hero-card { width: 100%; max-width: 560px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; box-shadow: 0 0 0 1px rgba(255,255,255,0.03), 0 8px 32px rgba(0,0,0,0.4), 0 32px 80px rgba(0,0,0,0.3); }
+    .hero-card-bar { background: rgba(255,255,255,0.04); border-bottom: 1px solid var(--border); padding: 12px 16px; display: flex; align-items: center; gap: 8px; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; }
+    .dot-r { background: #FF5F57; } .dot-y { background: #FFBD2E; } .dot-g { background: #28C840; }
+    .hero-card-bar-label { margin-left: 8px; font-size: 0.75rem; color: var(--t3); font-weight: 500; }
+    .mock-dashboard { padding: 24px; }
+    .mock-dashboard-title { font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--t3); margin-bottom: 20px; }
+    .sensor-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 20px; }
+    .sensor-tile { background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 8px; padding: 12px 10px; display: flex; flex-direction: column; gap: 6px; cursor: default; transition: background 0.15s ease; }
+    .sensor-tile:hover { background: rgba(255,255,255,0.07); }
+    .sensor-tile.active { background: rgba(245,80,20,0.1); border-color: rgba(245,80,20,0.25); }
+    .sensor-tile-icon { font-size: 1rem; line-height: 1; }
+    .sensor-tile-label { font-size: 0.625rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--t3); }
+    .sensor-tile.active .sensor-tile-label { color: rgba(245,80,20,0.8); }
+    .sensor-tile-val { font-size: 0.8125rem; font-weight: 700; color: var(--t1); }
+    .stat-row-hero { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .stat-card-hero { background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 8px; padding: 14px 12px; }
+    .stat-card-val { font-size: 1.125rem; font-weight: 700; color: var(--white); letter-spacing: -0.02em; margin-bottom: 3px; }
+    .stat-card-val span { color: var(--orange); }
+    .stat-card-label { font-size: 0.6875rem; color: var(--t3); font-weight: 500; }
+
+    /* Metrics band */
+    .metrics { border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 48px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; }
+    .metric-item { padding: 16px 32px; border-right: 1px solid var(--border); }
+    .metric-item:first-child { padding-left: 0; }
+    .metric-item:last-child  { border-right: none; }
+    .metric-val { font-size: 2.25rem; font-weight: 700; letter-spacing: -0.04em; color: var(--white); margin-bottom: 6px; }
+    .metric-val span { color: var(--orange); }
+    .metric-label { font-size: 0.8125rem; color: var(--t3); line-height: 1.4; }
+
+    /* Intro section */
+    .intro { display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: start; border-top: 1px solid var(--border); padding: 96px 48px; }
+    .intro-right p { font-size: 0.9375rem; line-height: 1.75; color: var(--t2); margin-bottom: 32px; }
+    .intro-right p:last-child { margin-bottom: 0; }
+
+    /* Features */
+    .features { border-top: 1px solid var(--border); padding: 96px 48px; }
+    .features-header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 64px; gap: 40px; }
+    .features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; background: var(--border); border-radius: 12px; overflow: hidden; }
+    .feature-card { background: var(--bg); padding: 40px 36px; transition: background 0.2s ease; cursor: default; }
+    .feature-card:hover { background: var(--bg2); }
+    .feature-num { font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.1em; color: var(--t3); margin-bottom: 20px; }
+    .feature-icon { width: 40px; height: 40px; background: rgba(245,80,20,0.1); border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-bottom: 20px; }
+    .feature-icon svg { width: 18px; height: 18px; stroke: var(--orange); fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+    .feature-title { font-size: 1.0625rem; font-weight: 600; color: var(--white); letter-spacing: -0.02em; margin-bottom: 12px; }
+    .feature-desc { font-size: 0.875rem; line-height: 1.7; color: var(--t2); }
+
+    /* Process section */
+    .process { border-top: 1px solid var(--border); padding: 96px 48px; }
+    .process-inner { display: grid; grid-template-columns: 1fr 1fr; gap: 96px; align-items: start; }
+    .process-steps { margin-top: 48px; display: flex; flex-direction: column; }
+    .process-step { display: flex; gap: 24px; padding: 28px 0; border-bottom: 1px solid var(--border); cursor: default; }
+    .process-step:last-child { border-bottom: none; }
+    .process-step:hover .ps-title { color: var(--white); }
+    .ps-num { font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.08em; color: var(--orange); padding-top: 3px; width: 28px; flex-shrink: 0; }
+    .ps-title { font-size: 0.9375rem; font-weight: 600; color: var(--t1); letter-spacing: -0.01em; margin-bottom: 6px; transition: color 0.2s ease; }
+    .ps-desc { font-size: 0.875rem; line-height: 1.65; color: var(--t3); }
+    .process-visual { position: sticky; top: 120px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 40px; box-shadow: 0 8px 32px rgba(0,0,0,0.3); }
+    .process-visual-label { font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--t3); margin-bottom: 28px; }
+    .pv-field-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.05); gap: 12px; }
+    .pv-field-row:last-of-type { border-bottom: none; }
+    .pv-field-name { font-size: 0.8125rem; font-weight: 600; color: var(--t1); }
+    .pv-field-sub  { font-size: 0.75rem; color: var(--t3); margin-top: 2px; }
+    .pv-bar-wrap   { width: 120px; height: 6px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden; flex-shrink: 0; }
+    .pv-bar        { height: 100%; border-radius: 3px; background: var(--orange); opacity: 0.7; }
+    .pv-pct        { font-size: 0.75rem; font-weight: 600; color: var(--orange); width: 36px; text-align: right; flex-shrink: 0; }
+    .pv-alert      { margin-top: 24px; background: rgba(245,80,20,0.08); border: 1px solid rgba(245,80,20,0.2); border-radius: 8px; padding: 14px 16px; display: flex; gap: 12px; }
+    .pv-alert-dot  { width: 8px; height: 8px; border-radius: 50%; background: var(--orange); margin-top: 4px; flex-shrink: 0; }
+    .pv-alert-text { font-size: 0.8125rem; color: var(--t2); line-height: 1.55; }
+    .pv-alert-text strong { color: var(--orange); font-weight: 600; }
+
+    /* Why section */
+    .why-section { border-top: 1px solid var(--border); padding: 96px 48px; }
+    .why-inner { display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: start; }
+    .why-points { margin-top: 48px; display: flex; flex-direction: column; gap: 32px; }
+    .why-point { display: flex; gap: 20px; }
+    .why-point-num { font-size: 0.75rem; font-weight: 700; color: var(--orange); background: rgba(245,80,20,0.1); border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .why-point-title { font-size: 0.9375rem; font-weight: 600; color: var(--t1); margin-bottom: 6px; }
+    .why-point-desc  { font-size: 0.875rem; line-height: 1.65; color: var(--t3); }
+    .quote-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 40px; margin-bottom: 24px; }
+    .quote-text { font-size: 1.125rem; font-weight: 400; line-height: 1.65; color: var(--t1); font-style: italic; margin-bottom: 28px; }
+    .quote-author { display: flex; align-items: center; gap: 12px; }
+    .quote-avatar { width: 36px; height: 36px; border-radius: 50%; background: rgba(245,80,20,0.15); border: 1px solid rgba(245,80,20,0.2); display: flex; align-items: center; justify-content: center; font-size: 0.875rem; font-weight: 700; color: var(--orange); }
+    .quote-name { font-size: 0.875rem; font-weight: 600; color: var(--t1); }
+    .quote-role { font-size: 0.75rem; color: var(--t3); }
+    .why-stat-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .why-stat { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; }
+    .why-stat-val { font-size: 1.75rem; font-weight: 700; color: var(--white); letter-spacing: -0.03em; margin-bottom: 4px; }
+    .why-stat-val span { color: var(--orange); }
+    .why-stat-label { font-size: 0.8125rem; color: var(--t3); }
+
+    /* CTA band */
+    .cta-band { border-top: 1px solid var(--border); background: var(--bg2); padding: 96px 48px; text-align: center; position: relative; overflow: hidden; }
+    .cta-band::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: radial-gradient(ellipse 60% 80% at 50% 50%, rgba(245,80,20,0.05) 0%, transparent 70%); pointer-events: none; }
+    .cta-band-label { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--orange); margin-bottom: 20px; }
+    .cta-band h2 { font-size: clamp(2rem, 3.5vw, 3.25rem); font-weight: 700; letter-spacing: -0.03em; color: var(--white); line-height: 1.1; margin-bottom: 20px; position: relative; }
+    .cta-band p { font-size: 0.9375rem; color: var(--t2); max-width: 480px; margin: 0 auto 40px; line-height: 1.7; }
+    .cta-band-btns { display: flex; align-items: center; justify-content: center; gap: 16px; }
+
+    /* Homepage footer */
+    .home-footer { border-top: 1px solid var(--border); padding: 48px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+    .home-footer-logo { font-size: 0.875rem; font-weight: 700; color: var(--t2); cursor: pointer; background: none; border: none; font-family: inherit; }
+    .home-footer-logo span { color: var(--orange); }
+    .home-footer-links { display: flex; gap: 32px; list-style: none; }
+    .home-footer-links button { font-size: 0.8125rem; color: var(--t3); background: none; border: none; font-family: inherit; cursor: pointer; transition: color 0.2s; }
+    .home-footer-links button:hover { color: var(--t2); }
+    .home-footer-copy { font-size: 0.75rem; color: var(--t3); }
+
+    /* Section shared labels */
+    .section-label { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--orange); margin-bottom: 16px; }
+    .section-h2 { font-size: clamp(1.75rem, 2.5vw, 2.5rem); font-weight: 700; line-height: 1.1; letter-spacing: -0.03em; color: var(--white); margin-bottom: 20px; }
+    .section-body { font-size: 0.9375rem; line-height: 1.75; color: var(--t2); }
+    hr.divider { border: none; border-top: 1px solid var(--border); margin: 0 48px; }
+
+    /* Animations */
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+<body>
+
+<!-- ── Login Modal ─────────────────────────────────────────────── -->
+<div id="login-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:9999; align-items:center; justify-content:center;">
+  <div style="background:#111820; border:1px solid #1e2d3d; border-radius:12px; padding:40px; width:380px; max-width:90vw;">
+    <h2 style="font-family:'Albert Sans',sans-serif; font-size:22px; font-weight:700; color:#fff; margin:0 0 6px;">FarmOS Login</h2>
+    <p style="font-family:'Albert Sans',sans-serif; font-size:13px; color:#6b7a8d; margin:0 0 28px;">Enter your NUID and password to continue.</p>
+
+    <label style="display:block; font-family:'Albert Sans',sans-serif; font-size:12px; font-weight:600; color:#8a9bb0; letter-spacing:.08em; text-transform:uppercase; margin-bottom:6px;">NUID</label>
+    <input id="login-nuid" type="text" placeholder="e.g. 12345678"
+      style="width:100%; box-sizing:border-box; background:#080d10; border:1px solid #1e2d3d; border-radius:8px; padding:10px 14px; color:#fff; font-family:'Albert Sans',sans-serif; font-size:14px; outline:none; margin-bottom:16px;"
+      onkeydown="if(event.key==='Enter') handleLogin()"
+    />
+
+    <label style="display:block; font-family:'Albert Sans',sans-serif; font-size:12px; font-weight:600; color:#8a9bb0; letter-spacing:.08em; text-transform:uppercase; margin-bottom:6px;">Password</label>
+    <input id="login-password" type="password" placeholder="Password"
+      style="width:100%; box-sizing:border-box; background:#080d10; border:1px solid #1e2d3d; border-radius:8px; padding:10px 14px; color:#fff; font-family:'Albert Sans',sans-serif; font-size:14px; outline:none; margin-bottom:24px;"
+      onkeydown="if(event.key==='Enter') handleLogin()"
+    />
+
+    <div id="login-error" style="display:none; color:#f55014; font-family:'Albert Sans',sans-serif; font-size:13px; margin-bottom:16px;"></div>
+
+    <button onclick="handleLogin()"
+      style="width:100%; background:#F55014; color:#fff; border:none; border-radius:8px; padding:12px; font-family:'Albert Sans',sans-serif; font-size:14px; font-weight:700; cursor:pointer; transition:opacity .15s;"
+      onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'"
+      onfocus="this.style.outline='2px solid #F55014'" onblur="this.style.outline='none'"
+      onmousedown="this.style.opacity='.7'" onmouseup="this.style.opacity='.85'"
+    >Sign In</button>
+  </div>
+</div>
+
+  <!-- ═══════════════════════════════════════
+       HOMEPAGE NAV (only shown on home)
+  ═══════════════════════════════════════ -->
+  <nav id="home-nav">
+    <button class="home-nav-logo" onclick="navigate('home')">farm<span>os</span></button>
+    <div class="home-nav-right">
+      <ul class="home-nav-links">
+        <li><a href="#features-anchor" onclick="scrollToSection(event,'features-anchor')">Features</a></li>
+        <li><a href="#process-anchor" onclick="scrollToSection(event,'process-anchor')">How It Works</a></li>
+        <li><a href="#why-anchor" onclick="scrollToSection(event,'why-anchor')">Why FarmOS</a></li>
+      </ul>
+      <button class="home-nav-cta" onclick="navigate('dashboard')">Open App</button>
+      <div id="user-nav" style="display:flex; align-items:center;"></div>
+    </div>
+  </nav>
+
+  <!-- ═══════════════════════════════════════
+       APP SIDEBAR (only shown in app pages)
+  ═══════════════════════════════════════ -->
+  <aside id="sidebar">
+    <div class="sb-logo">
+      <button class="sb-logo-link" onclick="navigate('home')">farm<span>os</span></button>
+      <div class="sb-farm">UNL Research Farm<br>East Campus · Lincoln, NE</div>
+    </div>
+    <nav class="sb-nav">
+      <div class="sb-section-label">Main</div>
+      <button class="sb-link" data-page="dashboard" onclick="navigate('dashboard')">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        Dashboard
+      </button>
+      <button class="sb-link" data-page="fields" onclick="navigate('fields')">
+        <svg viewBox="0 0 24 24"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>
+        Fields &amp; Plots
+      </button>
+      <button class="sb-link" data-page="inventory" onclick="navigate('inventory')">
+        <svg viewBox="0 0 24 24"><path d="M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+        Inventory
+        <span class="sb-badge">1</span>
+      </button>
+      <button class="sb-link" data-page="treatments" onclick="navigate('treatments')">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+        Treatments
+        <span class="sb-badge">3</span>
+      </button>
+      <button class="sb-link" data-page="history" onclick="navigate('history')">
+        <svg viewBox="0 0 24 24"><polyline points="12 8 12 12 14 14"/><path d="M3.05 11a9 9 0 1 1 .5 4m-.5 5v-5h5"/></svg>
+        Usage History
+      </button>
+      <div class="sb-section-label" style="margin-top:8px;">Farm</div>
+      <button class="sb-link" onclick="alert('Equipment module coming in Step 3')">
+        <svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+        Equipment
+      </button>
+      <button class="sb-link" onclick="alert('Team module coming in Step 3')">
+        <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Team
+      </button>
+    </nav>
+    <div class="sb-user">
+      <div class="sb-user-name">Ishrat Jandu</div>
+      <div class="sb-user-role">Administrator · ijandu@unl.edu</div>
+    </div>
+  </aside>
+
+  <!-- ═══════════════════════════════════════
+       APP SHELL WRAPPER (margin for sidebar)
+  ═══════════════════════════════════════ -->
+  <div id="app-shell">
+
+    <!-- ─── PAGE: DASHBOARD ─── -->
+    <div class="page" id="page-dashboard">
+      <div class="app-main">
+        <div class="page-header">
+          <div>
+            <div class="page-title">Overview</div>
+            <div class="page-sub">UNL Research Farm — East Campus · 48.5 ha active</div>
+          </div>
+          <div style="font-size:0.8125rem;color:var(--t2);">Thu, April 3, 2026</div>
+        </div>
+
+        <div class="stats-strip">
+          <div class="stat-block"><div class="stat-num red">3</div><div class="stat-lbl">Overdue</div><div class="stat-detail">treatments past due</div></div>
+          <div class="stat-block"><div class="stat-num red">1</div><div class="stat-lbl">Critical Stock</div><div class="stat-detail">1 low · 5 ok</div></div>
+          <div class="stat-block"><div class="stat-num orange">4</div><div class="stat-lbl">Due This Week</div><div class="stat-detail">next 7 days</div></div>
+          <div class="stat-block"><div class="stat-num green">3</div><div class="stat-lbl">Logged Today</div><div class="stat-detail">entries recorded</div></div>
+          <div class="stat-block"><div class="stat-num orange">16</div><div class="stat-lbl">Active Plots</div><div class="stat-detail">38.0 ha total area</div></div>
+        </div>
+
+        <div class="grid-2">
+          <!-- Needs Attention -->
+          <div class="card">
+            <div class="card-head">
+              <div class="card-title">Needs Attention</div>
+              <button class="card-link" onclick="navigate('treatments')">View all →</button>
+            </div>
+            <div>
+              <div class="alert-row"><div class="alert-dot dot-red"></div><div class="alert-body"><div class="alert-title">Roundup PowerMAX — Plot A-01 (V3)</div><div class="alert-sub">due Mar 29 · 5 days overdue · 6.25 L needed</div></div><span class="badge badge-red">overdue</span></div>
+              <div class="alert-row"><div class="alert-dot dot-red"></div><div class="alert-body"><div class="alert-title">Roundup PowerMAX — Plot A-03 (V3)</div><div class="alert-sub">due Mar 29 · 5 days overdue · 6.25 L needed</div></div><span class="badge badge-red">overdue</span></div>
+              <div class="alert-row"><div class="alert-dot dot-red"></div><div class="alert-body"><div class="alert-title">Roundup PowerMAX — Plot B-01 (V2)</div><div class="alert-sub">due Mar 30 · 4 days overdue · 4.5 L needed</div></div><span class="badge badge-red">overdue</span></div>
+              <div class="alert-row"><div class="alert-dot dot-amber"></div><div class="alert-body"><div class="alert-title">Roundup PowerMAX — Low Stock</div><div class="alert-sub">55 L on hand · reorder threshold 80 L · ~6 days remaining</div></div><span class="badge badge-red">critical</span></div>
+              <div class="alert-row"><div class="alert-dot dot-amber"></div><div class="alert-body"><div class="alert-title">Diesel Fuel — Low Stock</div><div class="alert-sub">690 L on hand · reorder threshold 800 L · ~12 days remaining</div></div><span class="badge badge-amber">low</span></div>
+            </div>
+          </div>
+
+          <!-- Due This Week -->
+          <div class="card">
+            <div class="card-head">
+              <div class="card-title">Due This Week</div>
+              <button class="card-link" onclick="navigate('treatments')">Full schedule →</button>
+            </div>
+            <div>
+              <div class="alert-row"><div class="alert-dot dot-amber"></div><div class="alert-body"><div class="alert-title">Roundup PowerMAX — Plot A-05, A-07</div><div class="alert-sub">due Apr 5 · in 2 days · V3 stage · 12.5 L total</div></div><span class="badge badge-orange">in 2d</span></div>
+              <div class="alert-row"><div class="alert-dot dot-amber"></div><div class="alert-body"><div class="alert-title">Roundup PowerMAX — Plot B-03, B-05</div><div class="alert-sub">due Apr 5 · in 2 days · V2 stage · 9 L total</div></div><span class="badge badge-orange">in 2d</span></div>
+              <div class="alert-row"><div class="alert-dot dot-blue"></div><div class="alert-body"><div class="alert-title">Urea (46-0-0) — All Corn Plots A-01→A-08</div><div class="alert-sub">due Apr 9 · in 6 days · V6 stage · 2,400 kg total</div></div><span class="badge badge-blue">in 6d</span></div>
+              <div class="alert-row"><div class="alert-dot dot-blue"></div><div class="alert-body"><div class="alert-title">Anhydrous Ammonia — All Soy Plots B-01→B-08</div><div class="alert-sub">due Apr 10 · in 7 days · R1 stage · 1,080 kg total</div></div><span class="badge badge-blue">in 7d</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid-wide">
+          <!-- Inventory Snapshot -->
+          <div class="card">
+            <div class="card-head">
+              <div class="card-title">Inventory Snapshot</div>
+              <button class="card-link" onclick="navigate('inventory')">Manage →</button>
+            </div>
+            <div>
+              <div class="inv-row"><div><div class="inv-name">Roundup PowerMAX</div><div class="inv-cat">herbicide</div></div><div class="bar-track"><div class="bar-fill" style="width:23%;background:var(--red);"></div></div><div class="inv-qty">55 / 240 L</div><span class="badge badge-red">critical</span></div>
+              <div class="inv-row"><div><div class="inv-name">Diesel Fuel</div><div class="inv-cat">fuel</div></div><div class="bar-track"><div class="bar-fill" style="width:24%;background:var(--amber);"></div></div><div class="inv-qty">690 / 2,400 L</div><span class="badge badge-amber">low</span></div>
+              <div class="inv-row"><div><div class="inv-name">Urea (46-0-0)</div><div class="inv-cat">fertilizer</div></div><div class="bar-track"><div class="bar-fill" style="width:80%;background:var(--green);"></div></div><div class="inv-qty">2,400 kg</div><span class="badge badge-green">ok</span></div>
+              <div class="inv-row"><div><div class="inv-name">Anhydrous Ammonia</div><div class="inv-cat">fertilizer</div></div><div class="bar-track"><div class="bar-fill" style="width:75%;background:var(--green);"></div></div><div class="inv-qty">1,800 kg</div><span class="badge badge-green">ok</span></div>
+              <div class="inv-row"><div><div class="inv-name">Quilt Xcel Fungicide</div><div class="inv-cat">fungicide</div></div><div class="bar-track"><div class="bar-fill" style="width:66%;background:var(--green);"></div></div><div class="inv-qty">95 / 90 L</div><span class="badge badge-green">ok</span></div>
+              <div class="inv-row"><div><div class="inv-name">Corn Seed (Mixed)</div><div class="inv-cat">seed</div></div><div class="bar-track"><div class="bar-fill" style="width:90%;background:var(--green);"></div></div><div class="inv-qty">48 bags</div><span class="badge badge-green">ok</span></div>
+              <div class="inv-row"><div><div class="inv-name">Soybean Seed (Mixed)</div><div class="inv-cat">seed</div></div><div class="bar-track"><div class="bar-fill" style="width:88%;background:var(--green);"></div></div><div class="inv-qty">36 bags</div><span class="badge badge-green">ok</span></div>
+            </div>
+          </div>
+
+          <!-- Recent Activity -->
+          <div class="card">
+            <div class="card-head">
+              <div class="card-title">Recent Activity</div>
+              <button class="card-link" onclick="navigate('history')">All logs →</button>
+            </div>
+            <div>
+              <div class="activity-row"><div class="activity-date">Today</div><div class="activity-text"><strong>171 L diesel</strong> used — JD 8R 310 · 6h<br><span style="color:var(--t3);font-size:0.6875rem;">logged by M. Webb</span></div></div>
+              <div class="activity-row"><div class="activity-date">Today</div><div class="activity-text"><strong>21 L Roundup</strong> applied — Plot A-02<br><span style="color:var(--t3);font-size:0.6875rem;">logged by M. Webb</span></div></div>
+              <div class="activity-row"><div class="activity-date">Apr 2</div><div class="activity-text"><strong>171 L diesel</strong> — daily field ops<br><span style="color:var(--t3);font-size:0.6875rem;">logged by S. Okonkwo</span></div></div>
+              <div class="activity-row"><div class="activity-date">Apr 1</div><div class="activity-text"><strong>14 L Roundup</strong> — Plot B-02, V2<br><span style="color:var(--t3);font-size:0.6875rem;">logged by M. Webb</span></div></div>
+              <div class="activity-row"><div class="activity-date">Mar 31</div><div class="activity-text"><strong>171 L diesel</strong> — daily field ops<br><span style="color:var(--t3);font-size:0.6875rem;">logged by M. Webb</span></div></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- end dashboard -->
+
+    <!-- ─── PAGE: FIELDS ─── -->
+    <div class="page" id="page-fields">
+      <div class="app-main">
+        <div class="page-header">
+          <div><div class="page-title">Fields &amp; Plots</div><div class="page-sub">2 fields · 16 plots · 38.0 ha under trial · planted May 1, 2026</div></div>
+          <button class="btn btn-orange">+ Add Plot</button>
+        </div>
+
+        <div class="summary-4">
+          <div class="summary-card"><div class="summary-val"><span>2</span></div><div class="summary-lbl">Active Fields</div></div>
+          <div class="summary-card"><div class="summary-val"><span>16</span></div><div class="summary-lbl">Total Plots</div></div>
+          <div class="summary-card"><div class="summary-val">38<span>.0 ha</span></div><div class="summary-lbl">Total Trial Area</div></div>
+          <div class="summary-card"><div class="summary-val">8<span> varieties</span></div><div class="summary-lbl">4 corn + 4 soybean</div></div>
+        </div>
+
+        <!-- Block A -->
+        <div class="field-section">
+          <div class="field-header">
+            <div>
+              <div class="field-name">Block A — Corn Trials</div>
+              <div class="field-meta">
+                <span><svg viewBox="0 0 24 24"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>20.0 ha</span>
+                <span>Hastings silt loam</span>
+                <span>8 plots · 2.5 ha each</span>
+                <span>Planted May 1, 2026</span>
+              </div>
+            </div>
+            <button class="btn" onclick="navigate('treatments')">View Treatments</button>
+          </div>
+          <div class="field-table-wrap">
+            <table>
+              <thead><tr><th>Plot</th><th>Variety Code</th><th>Variety Name</th><th>Type</th><th>Rep</th><th>Area (ha)</th><th>Season Days</th><th>Current Stage</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td class="mono">A-01</td><td class="bold">DKC65-84</td><td>DeKalb 65-84</td><td><span class="badge badge-blue">commercial</span></td><td>1</td><td>2.5</td><td>118</td><td><span class="stage-pill">V3</span></td><td><span class="badge badge-red">overdue</span></td></tr>
+                <tr><td class="mono">A-02</td><td class="bold">DKC65-84</td><td>DeKalb 65-84</td><td><span class="badge badge-blue">commercial</span></td><td>2</td><td>2.5</td><td>118</td><td><span class="stage-pill">V3</span></td><td><span class="badge badge-green">on track</span></td></tr>
+                <tr><td class="mono">A-03</td><td class="bold">P1197AM</td><td>Pioneer P1197AM</td><td><span class="badge badge-blue">commercial</span></td><td>1</td><td>2.5</td><td>114</td><td><span class="stage-pill">V3</span></td><td><span class="badge badge-red">overdue</span></td></tr>
+                <tr><td class="mono">A-04</td><td class="bold">P1197AM</td><td>Pioneer P1197AM</td><td><span class="badge badge-blue">commercial</span></td><td>2</td><td>2.5</td><td>114</td><td><span class="stage-pill">V3</span></td><td><span class="badge badge-green">on track</span></td></tr>
+                <tr><td class="mono">A-05</td><td class="bold">UNL-X23</td><td>UNL Experimental Line 23</td><td><span class="badge badge-purple">experimental</span></td><td>1</td><td>2.5</td><td>122</td><td><span class="stage-pill">V3</span></td><td><span class="badge badge-amber">due soon</span></td></tr>
+                <tr><td class="mono">A-06</td><td class="bold">UNL-X23</td><td>UNL Experimental Line 23</td><td><span class="badge badge-purple">experimental</span></td><td>2</td><td>2.5</td><td>122</td><td><span class="stage-pill">V3</span></td><td><span class="badge badge-green">on track</span></td></tr>
+                <tr><td class="mono">A-07</td><td class="bold">UNL-X24</td><td>UNL Experimental Line 24</td><td><span class="badge badge-purple">experimental</span></td><td>1</td><td>2.5</td><td>119</td><td><span class="stage-pill">V3</span></td><td><span class="badge badge-amber">due soon</span></td></tr>
+                <tr><td class="mono">A-08</td><td class="bold">UNL-X24</td><td>UNL Experimental Line 24</td><td><span class="badge badge-purple">experimental</span></td><td>2</td><td>2.5</td><td>119</td><td><span class="stage-pill">V3</span></td><td><span class="badge badge-green">on track</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Block B -->
+        <div class="field-section">
+          <div class="field-header">
+            <div>
+              <div class="field-name">Block B — Soybean Trials</div>
+              <div class="field-meta">
+                <span><svg viewBox="0 0 24 24"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>18.0 ha</span>
+                <span>Crete silt loam</span>
+                <span>8 plots · 2.25 ha each</span>
+                <span>Planted May 1, 2026</span>
+              </div>
+            </div>
+            <button class="btn" onclick="navigate('treatments')">View Treatments</button>
+          </div>
+          <div class="field-table-wrap">
+            <table>
+              <thead><tr><th>Plot</th><th>Variety Code</th><th>Variety Name</th><th>Type</th><th>Rep</th><th>Area (ha)</th><th>Season Days</th><th>Current Stage</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td class="mono">B-01</td><td class="bold">AG36X6</td><td>Asgrow AG36X6</td><td><span class="badge badge-blue">commercial</span></td><td>1</td><td>2.25</td><td>98</td><td><span class="stage-pill">V2</span></td><td><span class="badge badge-red">overdue</span></td></tr>
+                <tr><td class="mono">B-02</td><td class="bold">AG36X6</td><td>Asgrow AG36X6</td><td><span class="badge badge-blue">commercial</span></td><td>2</td><td>2.25</td><td>98</td><td><span class="stage-pill">V2</span></td><td><span class="badge badge-green">on track</span></td></tr>
+                <tr><td class="mono">B-03</td><td class="bold">NK-S38</td><td>NK S38-H8</td><td><span class="badge badge-blue">commercial</span></td><td>1</td><td>2.25</td><td>102</td><td><span class="stage-pill">V2</span></td><td><span class="badge badge-amber">due soon</span></td></tr>
+                <tr><td class="mono">B-04</td><td class="bold">NK-S38</td><td>NK S38-H8</td><td><span class="badge badge-blue">commercial</span></td><td>2</td><td>2.25</td><td>102</td><td><span class="stage-pill">V2</span></td><td><span class="badge badge-green">on track</span></td></tr>
+                <tr><td class="mono">B-05</td><td class="bold">UNL-SX1</td><td>UNL Soy Experimental 1</td><td><span class="badge badge-purple">experimental</span></td><td>1</td><td>2.25</td><td>96</td><td><span class="stage-pill">V2</span></td><td><span class="badge badge-amber">due soon</span></td></tr>
+                <tr><td class="mono">B-06</td><td class="bold">UNL-SX1</td><td>UNL Soy Experimental 1</td><td><span class="badge badge-purple">experimental</span></td><td>2</td><td>2.25</td><td>96</td><td><span class="stage-pill">V2</span></td><td><span class="badge badge-green">on track</span></td></tr>
+                <tr><td class="mono">B-07</td><td class="bold">UNL-SX2</td><td>UNL Soy Experimental 2</td><td><span class="badge badge-purple">experimental</span></td><td>1</td><td>2.25</td><td>104</td><td><span class="stage-pill">V2</span></td><td><span class="badge badge-green">on track</span></td></tr>
+                <tr><td class="mono">B-08</td><td class="bold">UNL-SX2</td><td>UNL Soy Experimental 2</td><td><span class="badge badge-purple">experimental</span></td><td>2</td><td>2.25</td><td>104</td><td><span class="stage-pill">V2</span></td><td><span class="badge badge-green">on track</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- end fields -->
+
+    <!-- ─── PAGE: INVENTORY ─── -->
+    <div class="page" id="page-inventory">
+      <div class="app-main">
+        <div class="page-header">
+          <div><div class="page-title">Inventory</div><div class="page-sub">7 items tracked · Nutrien, Bayer, Syngenta, Bosselman Energy</div></div>
+          <div style="display:flex;gap:8px;"><button class="btn">Export CSV</button><button class="btn btn-orange">+ Log Usage</button></div>
+        </div>
+
+        <div class="stat-row4">
+          <div class="stat-card"><div class="stat-label">Total Items</div><div class="stat-value">7</div></div>
+          <div class="stat-card"><div class="stat-label">Critical</div><div class="stat-value red">1</div><div class="stat-sub">below 50% of threshold</div></div>
+          <div class="stat-card"><div class="stat-label">Low</div><div class="stat-value amber">1</div><div class="stat-sub">below reorder point</div></div>
+          <div class="stat-card"><div class="stat-label">Healthy</div><div class="stat-value green">5</div></div>
+        </div>
+
+        <!-- Stock Levels -->
+        <div class="card">
+          <div class="card-head"><div class="card-title">Stock Levels</div><div class="card-sub">sorted by urgency</div></div>
+          <div class="stock-row"><div><div class="stock-name">Roundup PowerMAX</div><div class="stock-cat">herbicide · Bayer Crop Science</div></div><div class="bar-wrap"><div class="bar-track"><div class="bar-fill" style="width:23%;background:var(--red);"></div></div><div class="bar-labels"><span class="bar-lbl">0</span><span class="bar-lbl">Reorder: 80 L</span><span class="bar-lbl">240 L</span></div></div><div class="qty-text">55 / 240 L</div><div class="days-text">~6 days</div><span class="badge badge-red">critical</span></div>
+          <div class="stock-row"><div><div class="stock-name">Diesel Fuel</div><div class="stock-cat">fuel · Bosselman Energy</div></div><div class="bar-wrap"><div class="bar-track"><div class="bar-fill" style="width:24%;background:var(--amber);"></div></div><div class="bar-labels"><span class="bar-lbl">0</span><span class="bar-lbl">Reorder: 800 L</span><span class="bar-lbl">2,400 L</span></div></div><div class="qty-text">690 / 2,400 L</div><div class="days-text">~12 days</div><span class="badge badge-amber">low</span></div>
+          <div class="stock-row"><div><div class="stock-name">Urea (46-0-0)</div><div class="stock-cat">fertilizer · Nutrien Ag Solutions</div></div><div class="bar-wrap"><div class="bar-track"><div class="bar-fill" style="width:80%;background:var(--green);"></div></div><div class="bar-labels"><span class="bar-lbl">0</span><span class="bar-lbl">Reorder: 500 kg</span><span class="bar-lbl">1,500 kg</span></div></div><div class="qty-text">2,400 / 1,500 kg</div><div class="days-text">—</div><span class="badge badge-green">ok</span></div>
+          <div class="stock-row"><div><div class="stock-name">Anhydrous Ammonia</div><div class="stock-cat">fertilizer · Nutrien Ag Solutions</div></div><div class="bar-wrap"><div class="bar-track"><div class="bar-fill" style="width:75%;background:var(--green);"></div></div><div class="bar-labels"><span class="bar-lbl">0</span><span class="bar-lbl">Reorder: 400 kg</span><span class="bar-lbl">1,200 kg</span></div></div><div class="qty-text">1,800 / 1,200 kg</div><div class="days-text">—</div><span class="badge badge-green">ok</span></div>
+          <div class="stock-row"><div><div class="stock-name">Quilt Xcel Fungicide</div><div class="stock-cat">fungicide · Syngenta</div></div><div class="bar-wrap"><div class="bar-track"><div class="bar-fill" style="width:66%;background:var(--green);"></div></div><div class="bar-labels"><span class="bar-lbl">0</span><span class="bar-lbl">Reorder: 30 L</span><span class="bar-lbl">90 L</span></div></div><div class="qty-text">95 / 90 L</div><div class="days-text">—</div><span class="badge badge-green">ok</span></div>
+          <div class="stock-row"><div><div class="stock-name">Corn Seed — Mixed Trials</div><div class="stock-cat">seed · Various</div></div><div class="bar-wrap"><div class="bar-track"><div class="bar-fill" style="width:90%;background:var(--green);"></div></div><div class="bar-labels"><span class="bar-lbl">0</span><span class="bar-lbl">Reorder: 10 bags</span><span class="bar-lbl">30 bags</span></div></div><div class="qty-text">48 / 30 bags</div><div class="days-text">—</div><span class="badge badge-green">ok</span></div>
+          <div class="stock-row"><div><div class="stock-name">Soybean Seed — Mixed Trials</div><div class="stock-cat">seed · Various</div></div><div class="bar-wrap"><div class="bar-track"><div class="bar-fill" style="width:88%;background:var(--green);"></div></div><div class="bar-labels"><span class="bar-lbl">0</span><span class="bar-lbl">Reorder: 8 bags</span><span class="bar-lbl">24 bags</span></div></div><div class="qty-text">36 / 24 bags</div><div class="days-text">—</div><span class="badge badge-green">ok</span></div>
+        </div>
+
+        <!-- Full Table -->
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title">All Items — Full Detail</div>
+            <input type="search" placeholder="Search items…" style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:0.8125rem;color:var(--t1);font-family:inherit;width:200px;" oninput="filterTable('inv-tbody', this.value)">
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Item</th><th>Category</th><th>On Hand</th><th>Unit</th><th>Reorder At</th><th>Reorder Qty</th><th>Unit Cost</th><th>Stock Value</th><th>Supplier</th><th>~Days Left</th><th>Status</th></tr></thead>
+              <tbody id="inv-tbody">
+                <tr><td class="bold">Roundup PowerMAX</td><td>herbicide</td><td class="mono td-red">55.0</td><td>L</td><td class="mono">80</td><td class="mono">200</td><td class="mono">$8.40</td><td class="mono">$462</td><td>Bayer Crop Science</td><td class="td-red">~6</td><td><span class="badge badge-red">critical</span></td></tr>
+                <tr><td class="bold">Diesel Fuel</td><td>fuel</td><td class="mono td-amber">690.0</td><td>L</td><td class="mono">800</td><td class="mono">3,000</td><td class="mono">$1.05</td><td class="mono">$724</td><td>Bosselman Energy</td><td class="td-amber">~12</td><td><span class="badge badge-amber">low</span></td></tr>
+                <tr><td class="bold">Urea (46-0-0)</td><td>fertilizer</td><td class="mono">2,400.0</td><td>kg</td><td class="mono">500</td><td class="mono">2,000</td><td class="mono">$0.72</td><td class="mono">$1,728</td><td>Nutrien Ag Solutions</td><td class="dim">—</td><td><span class="badge badge-green">ok</span></td></tr>
+                <tr><td class="bold">Anhydrous Ammonia</td><td>fertilizer</td><td class="mono">1,800.0</td><td>kg</td><td class="mono">400</td><td class="mono">1,500</td><td class="mono">$0.55</td><td class="mono">$990</td><td>Nutrien Ag Solutions</td><td class="dim">—</td><td><span class="badge badge-green">ok</span></td></tr>
+                <tr><td class="bold">Quilt Xcel Fungicide</td><td>fungicide</td><td class="mono">95.0</td><td>L</td><td class="mono">30</td><td class="mono">100</td><td class="mono">$24.50</td><td class="mono">$2,328</td><td>Syngenta</td><td class="dim">—</td><td><span class="badge badge-green">ok</span></td></tr>
+                <tr><td class="bold">Corn Seed — Mixed Trials</td><td>seed</td><td class="mono">48.0</td><td>bags</td><td class="mono">10</td><td class="mono">40</td><td class="mono">$285.00</td><td class="mono">$13,680</td><td>Various</td><td class="dim">—</td><td><span class="badge badge-green">ok</span></td></tr>
+                <tr><td class="bold">Soybean Seed — Mixed Trials</td><td>seed</td><td class="mono">36.0</td><td>bags</td><td class="mono">8</td><td class="mono">32</td><td class="mono">$52.00</td><td class="mono">$1,872</td><td>Various</td><td class="dim">—</td><td><span class="badge badge-green">ok</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- end inventory -->
+
+    <!-- ─── PAGE: TREATMENTS ─── -->
+    <div class="page" id="page-treatments">
+      <div class="app-main">
+        <div class="page-header">
+          <div><div class="page-title">Treatments</div><div class="page-sub">3 overdue · 7 due in 14 days · 48 total planned</div></div>
+          <div style="display:flex;gap:8px;"><button class="btn btn-orange">Mark All Overdue Applied</button></div>
+        </div>
+
+        <!-- Overdue -->
+        <div class="card">
+          <div class="card-head"><div class="card-title" style="color:var(--red);">Overdue — 3 treatments</div></div>
+          <div>
+            <div class="alert-row"><div class="alert-dot dot-red"></div><div class="alert-body"><div class="alert-title">Roundup PowerMAX — Plot A-01 (DKC65-84 · V3)</div><div class="alert-sub">due Mar 29 · 5 days overdue · 2.5 L/ha · total 6.25 L · <span style="color:var(--red);">insufficient stock</span></div></div><button class="btn btn-orange" style="padding:5px 12px;font-size:0.75rem;">Mark Applied</button></div>
+            <div class="alert-row"><div class="alert-dot dot-red"></div><div class="alert-body"><div class="alert-title">Roundup PowerMAX — Plot A-03 (P1197AM · V3)</div><div class="alert-sub">due Mar 29 · 5 days overdue · 2.5 L/ha · total 6.25 L</div></div><button class="btn btn-orange" style="padding:5px 12px;font-size:0.75rem;">Mark Applied</button></div>
+            <div class="alert-row"><div class="alert-dot dot-red"></div><div class="alert-body"><div class="alert-title">Roundup PowerMAX — Plot B-01 (AG36X6 · V2)</div><div class="alert-sub">due Mar 30 · 4 days overdue · 2.0 L/ha · total 4.5 L</div></div><button class="btn btn-orange" style="padding:5px 12px;font-size:0.75rem;">Mark Applied</button></div>
+          </div>
+        </div>
+
+        <!-- Upcoming Next 14 Days -->
+        <div class="card">
+          <div class="card-head"><div class="card-title">Upcoming — Next 14 Days</div><div class="card-sub">7 scheduled</div></div>
+          <div>
+            <div class="alert-row"><div class="alert-dot dot-amber"></div><div class="alert-body"><div class="alert-title">Roundup PowerMAX — Plot A-05 (UNL-X23 · V3)</div><div class="alert-sub">due Apr 5 · in 2 days · 2.5 L/ha · total 6.25 L</div></div><span class="badge badge-orange">in 2d</span></div>
+            <div class="alert-row"><div class="alert-dot dot-amber"></div><div class="alert-body"><div class="alert-title">Roundup PowerMAX — Plot A-07 (UNL-X24 · V3)</div><div class="alert-sub">due Apr 5 · in 2 days · 2.5 L/ha · total 6.25 L</div></div><span class="badge badge-orange">in 2d</span></div>
+            <div class="alert-row"><div class="alert-dot dot-amber"></div><div class="alert-body"><div class="alert-title">Roundup PowerMAX — Plot B-03 (NK-S38 · V2)</div><div class="alert-sub">due Apr 5 · in 2 days · 2.0 L/ha · total 4.5 L</div></div><span class="badge badge-orange">in 2d</span></div>
+            <div class="alert-row"><div class="alert-dot dot-amber"></div><div class="alert-body"><div class="alert-title">Roundup PowerMAX — Plot B-05 (UNL-SX1 · V2)</div><div class="alert-sub">due Apr 5 · in 2 days · 2.0 L/ha · total 4.5 L</div></div><span class="badge badge-orange">in 2d</span></div>
+            <div class="alert-row"><div class="alert-dot dot-blue"></div><div class="alert-body"><div class="alert-title">Urea (46-0-0) — Plots A-01 through A-08 (V6)</div><div class="alert-sub">due Apr 9 · in 6 days · 120 kg/ha · total 2,400 kg (all corn plots)</div></div><span class="badge badge-blue">in 6d</span></div>
+            <div class="alert-row"><div class="alert-dot dot-blue"></div><div class="alert-body"><div class="alert-title">Anhydrous Ammonia — Plots B-01 through B-08 (R1)</div><div class="alert-sub">due Apr 10 · in 7 days · 60 kg/ha · total 1,080 kg (all soy plots)</div></div><span class="badge badge-blue">in 7d</span></div>
+            <div class="alert-row"><div class="alert-dot dot-blue"></div><div class="alert-body"><div class="alert-title">Roundup PowerMAX — Plots A-02, A-04, A-06, A-08</div><div class="alert-sub">due Apr 11 · in 8 days · V3 stage · total 25 L</div></div><span class="badge badge-blue">in 8d</span></div>
+          </div>
+        </div>
+
+        <!-- Full Schedule by Plot -->
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title">Full Treatment Schedule</div>
+            <input type="search" placeholder="Search plots…" style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:0.8125rem;color:var(--t1);font-family:inherit;width:180px;" oninput="filterTable('tx-tbody', this.value)">
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Plot</th><th>Variety</th><th>Treatment</th><th>Stage</th><th>Planned Date</th><th>Rate/ha</th><th>Total</th><th>Status</th></tr></thead>
+              <tbody id="tx-tbody">
+                <tr><td class="mono">A-01</td><td>DKC65-84</td><td>Roundup PowerMAX</td><td><span class="stage-pill">V3</span></td><td class="dim">Mar 29</td><td class="mono">2.5 L</td><td class="mono">6.25 L</td><td><span class="badge badge-red">overdue</span></td></tr>
+                <tr><td class="mono">A-01</td><td>DKC65-84</td><td>Urea (46-0-0)</td><td><span class="stage-pill">V6</span></td><td class="dim">Jun 5</td><td class="mono">120 kg</td><td class="mono">300 kg</td><td><span class="badge badge-blue">scheduled</span></td></tr>
+                <tr><td class="mono">A-01</td><td>DKC65-84</td><td>Quilt Xcel Fungicide</td><td><span class="stage-pill">VT</span></td><td class="dim">Jul 5</td><td class="mono">0.75 L</td><td class="mono">1.88 L</td><td><span class="badge badge-blue">scheduled</span></td></tr>
+                <tr><td class="mono">A-02</td><td>DKC65-84</td><td>Roundup PowerMAX</td><td><span class="stage-pill">V3</span></td><td class="dim">Apr 11</td><td class="mono">2.5 L</td><td class="mono">6.25 L</td><td><span class="badge badge-green">on track</span></td></tr>
+                <tr><td class="mono">A-03</td><td>P1197AM</td><td>Roundup PowerMAX</td><td><span class="stage-pill">V3</span></td><td class="dim">Mar 29</td><td class="mono">2.5 L</td><td class="mono">6.25 L</td><td><span class="badge badge-red">overdue</span></td></tr>
+                <tr><td class="mono">A-04</td><td>P1197AM</td><td>Roundup PowerMAX</td><td><span class="stage-pill">V3</span></td><td class="dim">Apr 11</td><td class="mono">2.5 L</td><td class="mono">6.25 L</td><td><span class="badge badge-green">on track</span></td></tr>
+                <tr><td class="mono">A-05</td><td>UNL-X23</td><td>Roundup PowerMAX</td><td><span class="stage-pill">V3</span></td><td class="dim">Apr 5</td><td class="mono">2.5 L</td><td class="mono">6.25 L</td><td><span class="badge badge-amber">due soon</span></td></tr>
+                <tr><td class="mono">A-07</td><td>UNL-X24</td><td>Roundup PowerMAX</td><td><span class="stage-pill">V3</span></td><td class="dim">Apr 5</td><td class="mono">2.5 L</td><td class="mono">6.25 L</td><td><span class="badge badge-amber">due soon</span></td></tr>
+                <tr><td class="mono">B-01</td><td>AG36X6</td><td>Roundup PowerMAX</td><td><span class="stage-pill">V2</span></td><td class="dim">Mar 30</td><td class="mono">2.0 L</td><td class="mono">4.5 L</td><td><span class="badge badge-red">overdue</span></td></tr>
+                <tr><td class="mono">B-01</td><td>AG36X6</td><td>Anhydrous Ammonia</td><td><span class="stage-pill">R1</span></td><td class="dim">Jun 15</td><td class="mono">60 kg</td><td class="mono">135 kg</td><td><span class="badge badge-blue">scheduled</span></td></tr>
+                <tr><td class="mono">B-03</td><td>NK-S38</td><td>Roundup PowerMAX</td><td><span class="stage-pill">V2</span></td><td class="dim">Apr 5</td><td class="mono">2.0 L</td><td class="mono">4.5 L</td><td><span class="badge badge-amber">due soon</span></td></tr>
+                <tr><td class="mono">B-05</td><td>UNL-SX1</td><td>Roundup PowerMAX</td><td><span class="stage-pill">V2</span></td><td class="dim">Apr 5</td><td class="mono">2.0 L</td><td class="mono">4.5 L</td><td><span class="badge badge-amber">due soon</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- end treatments -->
+
+    <!-- ─── PAGE: HISTORY ─── -->
+    <div class="page" id="page-history">
+      <div class="app-main">
+        <div class="page-header">
+          <div><div class="page-title">Usage History</div><div class="page-sub">17 logs · last 14 days</div></div>
+          <button class="btn">Export CSV</button>
+        </div>
+
+        <!-- Filters -->
+        <div class="filters">
+          <select id="hist-item" onchange="filterHistory()">
+            <option value="">All Items</option>
+            <option>Diesel Fuel</option>
+            <option>Roundup PowerMAX</option>
+            <option>Urea (46-0-0)</option>
+          </select>
+          <select id="hist-period" onchange="filterHistory()">
+            <option value="7">Last 7 days</option>
+            <option value="14" selected>Last 14 days</option>
+            <option value="30">Last 30 days</option>
+            <option value="all">All time</option>
+          </select>
+          <select id="hist-src" onchange="filterHistory()">
+            <option value="all">All sources</option>
+            <option value="manual">Manual only</option>
+            <option value="ai">AI estimated</option>
+          </select>
+          <button class="btn" onclick="document.getElementById('hist-item').value='';document.getElementById('hist-period').value='14';document.getElementById('hist-src').value='all';filterHistory()">Clear</button>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><div class="card-title">Usage Log</div><div class="card-sub" id="hist-count">17 records</div></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Date</th><th>Item</th><th>Qty</th><th>Unit</th><th>Plot</th><th>Equipment</th><th>Logged By</th><th>Source</th><th>Notes</th></tr></thead>
+              <tbody id="hist-tbody">
+                <tr data-item="Diesel Fuel" data-src="manual" data-date="2026-04-03"><td class="dim">Apr 3, 2026</td><td class="bold">Diesel Fuel</td><td class="mono">171.0</td><td>L</td><td class="dim">—</td><td>JD 8R 310</td><td>M. Webb</td><td><span class="badge badge-blue">manual</span></td><td class="dim">Daily field operations</td></tr>
+                <tr data-item="Roundup PowerMAX" data-src="manual" data-date="2026-04-03"><td class="dim">Apr 3, 2026</td><td class="bold">Roundup PowerMAX</td><td class="mono">21.0</td><td>L</td><td class="mono">A-02</td><td>JD R4045</td><td>M. Webb</td><td><span class="badge badge-blue">manual</span></td><td class="dim">V3 herbicide — Block A</td></tr>
+                <tr data-item="Diesel Fuel" data-src="manual" data-date="2026-04-02"><td class="dim">Apr 2, 2026</td><td class="bold">Diesel Fuel</td><td class="mono">171.0</td><td>L</td><td class="dim">—</td><td>JD 8R 310</td><td>S. Okonkwo</td><td><span class="badge badge-blue">manual</span></td><td class="dim">Daily field operations</td></tr>
+                <tr data-item="Diesel Fuel" data-src="manual" data-date="2026-04-01"><td class="dim">Apr 1, 2026</td><td class="bold">Diesel Fuel</td><td class="mono">171.0</td><td>L</td><td class="dim">—</td><td>JD 8R 310</td><td>M. Webb</td><td><span class="badge badge-blue">manual</span></td><td class="dim">Daily field operations</td></tr>
+                <tr data-item="Roundup PowerMAX" data-src="manual" data-date="2026-04-01"><td class="dim">Apr 1, 2026</td><td class="bold">Roundup PowerMAX</td><td class="mono">14.0</td><td>L</td><td class="mono">B-02</td><td>JD R4045</td><td>M. Webb</td><td><span class="badge badge-blue">manual</span></td><td class="dim">V2 herbicide — Block B</td></tr>
+                <tr data-item="Diesel Fuel" data-src="manual" data-date="2026-03-31"><td class="dim">Mar 31, 2026</td><td class="bold">Diesel Fuel</td><td class="mono">171.0</td><td>L</td><td class="dim">—</td><td>JD 8R 310</td><td>M. Webb</td><td><span class="badge badge-blue">manual</span></td><td class="dim">Daily field operations</td></tr>
+                <tr data-item="Diesel Fuel" data-src="manual" data-date="2026-03-30"><td class="dim">Mar 30, 2026</td><td class="bold">Diesel Fuel</td><td class="mono">171.0</td><td>L</td><td class="dim">—</td><td>JD 8R 310</td><td>M. Webb</td><td><span class="badge badge-blue">manual</span></td><td class="dim">Daily field operations</td></tr>
+                <tr data-item="Roundup PowerMAX" data-src="manual" data-date="2026-03-30"><td class="dim">Mar 30, 2026</td><td class="bold">Roundup PowerMAX</td><td class="mono">21.0</td><td>L</td><td class="mono">A-02</td><td>JD R4045</td><td>M. Webb</td><td><span class="badge badge-blue">manual</span></td><td class="dim">V3 herbicide — Block A</td></tr>
+                <tr data-item="Diesel Fuel" data-src="manual" data-date="2026-03-29"><td class="dim">Mar 29, 2026</td><td class="bold">Diesel Fuel</td><td class="mono">171.0</td><td>L</td><td class="dim">—</td><td>JD 8R 310</td><td>M. Webb</td><td><span class="badge badge-blue">manual</span></td><td class="dim">Daily field operations</td></tr>
+                <tr data-item="Diesel Fuel" data-src="manual" data-date="2026-03-28"><td class="dim">Mar 28, 2026</td><td class="bold">Diesel Fuel</td><td class="mono">171.0</td><td>L</td><td class="dim">—</td><td>JD 8R 310</td><td>S. Okonkwo</td><td><span class="badge badge-blue">manual</span></td><td class="dim">Daily field operations</td></tr>
+                <tr data-item="Diesel Fuel" data-src="manual" data-date="2026-03-27"><td class="dim">Mar 27, 2026</td><td class="bold">Diesel Fuel</td><td class="mono">171.0</td><td>L</td><td class="dim">—</td><td>JD 8R 310</td><td>M. Webb</td><td><span class="badge badge-blue">manual</span></td><td class="dim">Daily field operations</td></tr>
+                <tr data-item="Roundup PowerMAX" data-src="manual" data-date="2026-03-27"><td class="dim">Mar 27, 2026</td><td class="bold">Roundup PowerMAX</td><td class="mono">21.0</td><td>L</td><td class="mono">A-02</td><td>JD R4045</td><td>M. Webb</td><td><span class="badge badge-blue">manual</span></td><td class="dim">V3 herbicide — Block A</td></tr>
+                <tr data-item="Diesel Fuel" data-src="manual" data-date="2026-03-26"><td class="dim">Mar 26, 2026</td><td class="bold">Diesel Fuel</td><td class="mono">171.0</td><td>L</td><td class="dim">—</td><td>JD 8R 310</td><td>M. Webb</td><td><span class="badge badge-blue">manual</span></td><td class="dim">Daily field operations</td></tr>
+                <tr data-item="Diesel Fuel" data-src="manual" data-date="2026-03-25"><td class="dim">Mar 25, 2026</td><td class="bold">Diesel Fuel</td><td class="mono">171.0</td><td>L</td><td class="dim">—</td><td>JD 8R 310</td><td>M. Webb</td><td><span class="badge badge-blue">manual</span></td><td class="dim">Daily field operations</td></tr>
+                <tr data-item="Diesel Fuel" data-src="manual" data-date="2026-03-24"><td class="dim">Mar 24, 2026</td><td class="bold">Diesel Fuel</td><td class="mono">171.0</td><td>L</td><td class="dim">—</td><td>JD 8R 310</td><td>S. Okonkwo</td><td><span class="badge badge-blue">manual</span></td><td class="dim">Daily field operations</td></tr>
+                <tr data-item="Roundup PowerMAX" data-src="manual" data-date="2026-03-24"><td class="dim">Mar 24, 2026</td><td class="bold">Roundup PowerMAX</td><td class="mono">21.0</td><td>L</td><td class="mono">A-02</td><td>JD R4045</td><td>M. Webb</td><td><span class="badge badge-blue">manual</span></td><td class="dim">V3 herbicide — Block A</td></tr>
+                <tr data-item="Diesel Fuel" data-src="manual" data-date="2026-03-23"><td class="dim">Mar 23, 2026</td><td class="bold">Diesel Fuel</td><td class="mono">171.0</td><td>L</td><td class="dim">—</td><td>JD 8R 310</td><td>M. Webb</td><td><span class="badge badge-blue">manual</span></td><td class="dim">Daily field operations</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- end history -->
+
+  </div><!-- end app-shell -->
+
+  <!-- ═══════════════════════════════════════
+       PAGE: HOME (LANDING)
+  ═══════════════════════════════════════ -->
+  <div class="page" id="page-home">
+
+    <!-- Hero -->
+    <section class="hero">
+      <div class="hero-left">
+        <span class="hero-tag">Precision Agriculture Platform</span>
+        <h1>Manage your fields with <em>data-driven</em> confidence</h1>
+        <p class="hero-sub">FarmOS connects sensors, weather, and crop intelligence into one unified dashboard — so every decision you make is backed by real data from the ground up.</p>
+        <div class="hero-btns">
+          <button class="btn btn-orange" onclick="navigate('dashboard')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            Open App
+          </button>
+          <a href="#features-anchor" class="btn btn-ghost" onclick="scrollToSection(event,'features-anchor')">See Features</a>
+        </div>
+      </div>
+      <div class="hero-right">
+        <div class="hero-card">
+          <div class="hero-card-bar">
+            <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+            <span class="hero-card-bar-label">FarmOS — Live Dashboard</span>
+          </div>
+          <div class="mock-dashboard">
+            <div class="mock-dashboard-title">Field Sensors — Active</div>
+            <div class="sensor-grid">
+              <div class="sensor-tile active"><div class="sensor-tile-icon">🌡️</div><div class="sensor-tile-label">Soil Temp</div><div class="sensor-tile-val">68°F</div></div>
+              <div class="sensor-tile active"><div class="sensor-tile-icon">💧</div><div class="sensor-tile-label">Moisture</div><div class="sensor-tile-val">42%</div></div>
+              <div class="sensor-tile"><div class="sensor-tile-icon">🌤</div><div class="sensor-tile-label">Weather</div><div class="sensor-tile-val">Clear</div></div>
+              <div class="sensor-tile"><div class="sensor-tile-icon">🌱</div><div class="sensor-tile-label">Growth</div><div class="sensor-tile-val">+3.2%</div></div>
+              <div class="sensor-tile active"><div class="sensor-tile-icon">💨</div><div class="sensor-tile-label">Wind</div><div class="sensor-tile-val">12 mph</div></div>
+              <div class="sensor-tile"><div class="sensor-tile-icon">🌧</div><div class="sensor-tile-label">Rain</div><div class="sensor-tile-val">0.2 in</div></div>
+              <div class="sensor-tile"><div class="sensor-tile-icon">☀️</div><div class="sensor-tile-label">UV Index</div><div class="sensor-tile-val">5.8</div></div>
+              <div class="sensor-tile active"><div class="sensor-tile-icon">🐛</div><div class="sensor-tile-label">Pest Alert</div><div class="sensor-tile-val">Low</div></div>
+            </div>
+            <div class="stat-row-hero">
+              <div class="stat-card-hero"><div class="stat-card-val"><span>12.4k</span></div><div class="stat-card-label">Acres Monitored</div></div>
+              <div class="stat-card-hero"><div class="stat-card-val"><span>99.7</span>%</div><div class="stat-card-label">Sensor Uptime</div></div>
+              <div class="stat-card-hero"><div class="stat-card-val"><span>8x</span></div><div class="stat-card-label">Avg. ROI</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Metrics Band -->
+    <div class="metrics">
+      <div class="metric-item"><div class="metric-val"><span>12,400</span>+</div><div class="metric-label">Acres under<br>active management</div></div>
+      <div class="metric-item"><div class="metric-val"><span>340</span>+</div><div class="metric-label">Farms using<br>FarmOS today</div></div>
+      <div class="metric-item"><div class="metric-val"><span>99.7</span>%</div><div class="metric-label">Platform uptime<br>year-round</div></div>
+      <div class="metric-item"><div class="metric-val"><span>8x</span></div><div class="metric-label">Average ROI<br>within first season</div></div>
+    </div>
+
+    <!-- Intro -->
+    <div class="intro" id="features-anchor">
+      <div>
+        <div class="section-label">What we do</div>
+        <h2 class="section-h2">Agriculture intelligence, built for the modern farm</h2>
+      </div>
+      <div class="intro-right">
+        <p>Farming has always been about reading the land — but today's farms are too large and complex to manage by intuition alone. FarmOS bridges the gap between raw field data and actionable insight.</p>
+        <p>From soil sensors to satellite imagery to AI-powered yield predictions, we give farmers and agronomists the tools to make confident decisions — before the season is won or lost.</p>
+        <button class="btn btn-ghost" onclick="navigate('dashboard')" style="display:inline-flex;">Explore the App →</button>
+      </div>
+    </div>
+
+    <hr class="divider" />
+
+    <!-- Features -->
+    <div class="features">
+      <div class="features-header">
+        <div><div class="section-label">Platform Features</div><h2 class="section-h2">Every tool your operation needs</h2></div>
+        <p class="section-body" style="max-width:320px;">Six integrated modules that cover the full crop lifecycle — from seed to harvest.</p>
+      </div>
+      <div class="features-grid">
+        <div class="feature-card"><div class="feature-num">01</div><div class="feature-icon"><svg viewBox="0 0 24 24"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg></div><div class="feature-title">Field Mapping</div><div class="feature-desc">Visualize every plot with satellite-quality boundary maps. Draw zones, assign crops, and track field history over multiple seasons at a glance.</div></div>
+        <div class="feature-card"><div class="feature-num">02</div><div class="feature-icon"><svg viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9z"/></svg></div><div class="feature-title">Weather Intelligence</div><div class="feature-desc">Hyperlocal 14-day forecasts tied to each field's GPS coordinates. Frost alerts, rain probability, and wind speed overlays keep you one step ahead.</div></div>
+        <div class="feature-card"><div class="feature-num">03</div><div class="feature-icon"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><div class="feature-title">Yield Analytics</div><div class="feature-desc">Compare actual vs. projected yield with historical benchmarks. Identify underperforming zones and optimize inputs for the next growing cycle.</div></div>
+        <div class="feature-card"><div class="feature-num">04</div><div class="feature-icon"><svg viewBox="0 0 24 24"><path d="M12 22a9 9 0 0 1-9-9c0-4.97 9-13 9-13s9 8.03 9 13a9 9 0 0 1-9 9z"/></svg></div><div class="feature-title">Irrigation Control</div><div class="feature-desc">Automate watering schedules based on real-time soil moisture readings. Reduce water usage by up to 30% while keeping crops in their optimal range.</div></div>
+        <div class="feature-card"><div class="feature-num">05</div><div class="feature-icon"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div><div class="feature-title">Pest Monitoring</div><div class="feature-desc">AI-assisted early detection of pest pressure and disease risk. Receive field-specific alerts with treatment recommendations before damage spreads.</div></div>
+        <div class="feature-card"><div class="feature-num">06</div><div class="feature-icon"><svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.68-8.4"/></svg></div><div class="feature-title">Crop Rotation Planner</div><div class="feature-desc">Multi-year rotation schedules with soil health scoring. FarmOS suggests optimal crop sequences based on nutrient history and market prices.</div></div>
+      </div>
+    </div>
+
+    <hr class="divider" />
+
+    <!-- Process -->
+    <div class="process" id="process-anchor">
+      <div class="process-inner">
+        <div>
+          <div class="section-label">How It Works</div>
+          <h2 class="section-h2">From soil to insight in four steps</h2>
+          <p class="section-body">Setup takes less than a day. Results show up within the first week.</p>
+          <div class="process-steps">
+            <div class="process-step"><div class="ps-num">01</div><div><div class="ps-title">Connect your sensors</div><div class="ps-desc">Drop FarmOS IoT sensors into your fields or integrate existing equipment. Our hardware-agnostic platform supports 40+ sensor manufacturers out of the box.</div></div></div>
+            <div class="process-step"><div class="ps-num">02</div><div><div class="ps-title">Map your operation</div><div class="ps-desc">Import field boundaries from shapefiles or draw them on our satellite map. Assign crops, soil types, and irrigation zones in minutes.</div></div></div>
+            <div class="process-step"><div class="ps-num">03</div><div><div class="ps-title">Analyze real-time data</div><div class="ps-desc">FarmOS processes sensor readings, weather feeds, and satellite imagery continuously. Your dashboard updates every 15 minutes with actionable alerts.</div></div></div>
+            <div class="process-step"><div class="ps-num">04</div><div><div class="ps-title">Optimize for next season</div><div class="ps-desc">End-of-season reports surface what worked and what didn't — with AI recommendations for inputs, rotations, and timing to improve next year's yield.</div></div></div>
+          </div>
+        </div>
+        <div>
+          <div class="process-visual">
+            <div class="process-visual-label">Field Performance — Current Season</div>
+            <div class="pv-field-row"><div><div class="pv-field-name">North 40 — Corn</div><div class="pv-field-sub">40 acres · planted Apr 12</div></div><div class="pv-bar-wrap"><div class="pv-bar" style="width:87%;"></div></div><div class="pv-pct">87%</div></div>
+            <div class="pv-field-row"><div><div class="pv-field-name">East Quarter — Soybeans</div><div class="pv-field-sub">160 acres · planted May 3</div></div><div class="pv-bar-wrap"><div class="pv-bar" style="width:72%;"></div></div><div class="pv-pct">72%</div></div>
+            <div class="pv-field-row"><div><div class="pv-field-name">South Creek — Wheat</div><div class="pv-field-sub">80 acres · planted Mar 28</div></div><div class="pv-bar-wrap"><div class="pv-bar" style="width:94%;"></div></div><div class="pv-pct">94%</div></div>
+            <div class="pv-field-row"><div><div class="pv-field-name">West Pivot — Alfalfa</div><div class="pv-field-sub">55 acres · planted Apr 20</div></div><div class="pv-bar-wrap"><div class="pv-bar" style="width:61%;"></div></div><div class="pv-pct">61%</div></div>
+            <div class="pv-alert"><div class="pv-alert-dot"></div><div class="pv-alert-text"><strong>Alert:</strong> East Quarter soil moisture dropped below threshold (38%). Irrigation recommended within 48 hours.</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <hr class="divider" />
+
+    <!-- Why -->
+    <div class="why-section" id="why-anchor">
+      <div class="why-inner">
+        <div>
+          <div class="section-label">Why FarmOS</div>
+          <h2 class="section-h2">Built by agronomists, not just engineers</h2>
+          <div class="why-points">
+            <div class="why-point"><div class="why-point-num">1</div><div><div class="why-point-title">Agronomist-designed workflows</div><div class="why-point-desc">Every feature was co-designed with working farmers and certified agronomists. We know what actually matters at planting time and harvest.</div></div></div>
+            <div class="why-point"><div class="why-point-num">2</div><div><div class="why-point-title">Works offline, syncs when ready</div><div class="why-point-desc">Cell coverage is unreliable in the field. FarmOS keeps working locally and syncs all data automatically when you're back in range.</div></div></div>
+            <div class="why-point"><div class="why-point-num">3</div><div><div class="why-point-title">No data lock-in</div><div class="why-point-desc">Your field data is yours. Export everything as CSV, shapefile, or JSON at any time. We don't hold your history hostage.</div></div></div>
+            <div class="why-point"><div class="why-point-num">4</div><div><div class="why-point-title">University research-backed</div><div class="why-point-desc">Built in partnership with the University of Nebraska's precision ag program. Our yield models are validated against real multi-year field trials.</div></div></div>
+          </div>
+        </div>
+        <div>
+          <div class="quote-card">
+            <div class="quote-text">"We cut our input costs by 22% in the first season just by following FarmOS's fertilizer recommendations. The ROI paid for the subscription ten times over."</div>
+            <div class="quote-author">
+              <div class="quote-avatar">JH</div>
+              <div><div class="quote-name">James Hartley</div><div class="quote-role">4th-generation farmer, York County NE — 800 acres</div></div>
+            </div>
+          </div>
+          <div class="why-stat-row">
+            <div class="why-stat"><div class="why-stat-val"><span>22</span>%</div><div class="why-stat-label">Avg. reduction in input costs</div></div>
+            <div class="why-stat"><div class="why-stat-val"><span>30</span>%</div><div class="why-stat-label">Less water used per season</div></div>
+            <div class="why-stat"><div class="why-stat-val"><span>18</span>%</div><div class="why-stat-label">Yield improvement YoY</div></div>
+            <div class="why-stat"><div class="why-stat-val"><span>&lt;1</span>hr</div><div class="why-stat-label">Time to first insight</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CTA Band -->
+    <div class="cta-band">
+      <div class="cta-band-label">Get Started</div>
+      <h2>Ready to farm smarter?</h2>
+      <p>Book a 30-minute demo with our team. We'll walk through your operation and show you exactly what FarmOS can do for your fields this season.</p>
+      <div class="cta-band-btns">
+        <button class="btn btn-orange" onclick="navigate('dashboard')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          Open App
+        </button>
+        <a href="#features-anchor" class="btn btn-ghost" onclick="scrollToSection(event,'features-anchor')">Learn More</a>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="home-footer">
+      <button class="home-footer-logo" onclick="navigate('home')">farm<span>os</span></button>
+      <ul class="home-footer-links">
+        <li><button onclick="navigate('dashboard')">Dashboard</button></li>
+        <li><button onclick="navigate('fields')">Fields</button></li>
+        <li><button onclick="navigate('inventory')">Inventory</button></li>
+        <li><button onclick="navigate('treatments')">Treatments</button></li>
+        <li><button onclick="navigate('history')">History</button></li>
+      </ul>
+      <div class="home-footer-copy">© 2026 FarmOS. University of Nebraska Precision Ag.</div>
+    </footer>
+
+  </div><!-- end page-home -->
+
+
+  <!-- ═══════════════════════════════════════
+       ROUTER JS
+  ═══════════════════════════════════════ -->
+  <script>
+    const APP_PAGES = ['dashboard', 'fields', 'inventory', 'treatments', 'history'];
+
+    function navigate(page) {
+      // Hide all pages
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+
+      const isApp = APP_PAGES.includes(page);
+
+      // Show/hide app chrome
+      const sidebar  = document.getElementById('sidebar');
+      const appShell = document.getElementById('app-shell');
+      const homeNav  = document.getElementById('home-nav');
+
+      if (isApp) {
+        sidebar.classList.add('visible');
+        appShell.classList.add('visible');
+        homeNav.classList.remove('visible');
+        // Show the correct page inside app-shell
+        document.getElementById('page-' + page).classList.add('active');
+        // Update active sidebar link
+        document.querySelectorAll('.sb-link').forEach(l => {
+          l.classList.toggle('active', l.dataset.page === page);
+        });
+        window.scrollTo(0, 0);
+      } else {
+        // Home page
+        sidebar.classList.remove('visible');
+        appShell.classList.remove('visible');
+        homeNav.classList.add('visible');
+        document.getElementById('page-home').classList.add('active');
+        window.scrollTo(0, 0);
+      }
+
+      history.pushState({ page }, '', '#' + page);
+    }
+
+    function scrollToSection(e, id) {
+      e.preventDefault();
+      const el = document.getElementById(id);
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function filterTable(tbodyId, val) {
+      document.querySelectorAll('#' + tbodyId + ' tr').forEach(r => {
+        r.style.display = val && !r.textContent.toLowerCase().includes(val.toLowerCase()) ? 'none' : '';
+      });
+    }
+
+    function filterHistory() {
+      const item   = document.getElementById('hist-item').value.toLowerCase();
+      const period = document.getElementById('hist-period').value;
+      const src    = document.getElementById('hist-src').value;
+      const cutoff = period === 'all' ? null : new Date(Date.now() - parseInt(period) * 86400000);
+      let visible = 0;
+      document.querySelectorAll('#hist-tbody tr').forEach(r => {
+        const matchItem   = !item   || r.dataset.item.toLowerCase().includes(item);
+        const matchSrc    = src === 'all' || r.dataset.src === src;
+        const rowDate     = new Date(r.dataset.date);
+        const matchPeriod = !cutoff  || rowDate >= cutoff;
+        const show = matchItem && matchSrc && matchPeriod;
+        r.style.display = show ? '' : 'none';
+        if (show) visible++;
+      });
+      document.getElementById('hist-count').textContent = visible + ' records';
+    }
+
+    // Initial load
+    const startPage = location.hash.replace('#', '') || 'home';
+    navigate(startPage);
+
+    window.addEventListener('popstate', e => {
+      navigate((e.state && e.state.page) || 'home');
+    });
+  </script>
+
+<!-- ── FarmOS API Integration ──────────────────────────────────── -->
+<script>
+const API = 'http://localhost:8000';
+
+function getToken() { return sessionStorage.getItem('farmos_token'); }
+function getUser()  { return JSON.parse(sessionStorage.getItem('farmos_user') || 'null'); }
+
+function setSession(token, user) {
+  sessionStorage.setItem('farmos_token', token);
+  sessionStorage.setItem('farmos_user', JSON.stringify(user));
+}
+
+function clearSession() {
+  sessionStorage.removeItem('farmos_token');
+  sessionStorage.removeItem('farmos_user');
+}
+
+async function apiFetch(path, options = {}) {
+  const token = getToken();
+  const res = await fetch(API + path, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      ...(options.headers || {}),
+    },
+  });
+  if (res.status === 401) { showLoginModal(); throw new Error('Unauthorized'); }
+  return res;
+}
+
+function showLoginModal() {
+  document.getElementById('login-modal').style.display = 'flex';
+}
+
+function hideLoginModal() {
+  document.getElementById('login-modal').style.display = 'none';
+}
+
+async function handleLogin() {
+  const nuid = document.getElementById('login-nuid').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  errEl.style.display = 'none';
+
+  try {
+    const res = await fetch(`${API}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nuid, password }),
+    });
+    if (!res.ok) {
+      errEl.textContent = 'Invalid NUID or password.';
+      errEl.style.display = 'block';
+      return;
+    }
+    const data = await res.json();
+    setSession(data.token, { user_id: data.user_id, name: data.name });
+    hideLoginModal();
+    updateUserNav();
+  } catch (e) {
+    errEl.textContent = 'Could not connect to server. Is api.py running?';
+    errEl.style.display = 'block';
+  }
+}
+
+async function handleLogout() {
+  try { await apiFetch('/auth/logout', { method: 'POST' }); } catch {}
+  clearSession();
+  showLoginModal();
+  updateUserNav();
+}
+
+function updateUserNav() {
+  const user = getUser();
+  const el = document.getElementById('user-nav');
+  if (!el) return;
+  if (user) {
+    el.innerHTML = `<span style="color:#8a9bb0; font-size:13px; font-family:'Albert Sans',sans-serif;">${user.name}</span>
+      <button onclick="handleLogout()" style="background:none; border:none; color:#F55014; font-size:13px; font-family:'Albert Sans',sans-serif; cursor:pointer; margin-left:12px;">Sign out</button>`;
+  } else {
+    el.innerHTML = '';
+  }
+}
+
+// On page load: show modal if not authenticated
+window.addEventListener('DOMContentLoaded', () => {
+  if (!getToken()) showLoginModal();
+  else updateUserNav();
+});
+</script>
+
+</body>
+</html>
