@@ -64,8 +64,8 @@ def get_db():
 
 
 # ── AUTH DEPENDENCY ───────────────────────────────────────────────────────────
-def get_current_user(authorization: str = Header(...)) -> SessionUser:
-    if not authorization.startswith("Bearer "):
+def get_current_user(authorization: Optional[str] = Header(default=None)) -> SessionUser:
+    if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Invalid authorization header")
     token = authorization.removeprefix("Bearer ").strip()
     if token not in sessions:
@@ -146,7 +146,13 @@ def get_plots(
     current_user: SessionUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    plots = db.query(Plot).filter_by(field_id=field_id).order_by(Plot.plot_code).all()
+    plots = (
+        db.query(Plot)
+        .join(Field, Plot.field_id == Field.id)
+        .filter(Field.farm_id == FARM_ID, Plot.field_id == field_id)
+        .order_by(Plot.plot_code)
+        .all()
+    )
     return [
         {"id": p.id, "plot_code": p.plot_code, "area_ha": p.area_ha, "replication": p.replication}
         for p in plots
@@ -158,7 +164,7 @@ def get_equipment(
     current_user: SessionUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    equip = db.query(Equipment).filter_by(farm_id=FARM_ID).all()
+    equip = db.query(Equipment).filter_by(farm_id=FARM_ID).order_by(Equipment.name).all()
     return [
         {
             "id": e.id,
@@ -168,6 +174,76 @@ def get_equipment(
         }
         for e in equip
     ]
+
+
+# ── PYDANTIC — LOG REQUEST ────────────────────────────────────────────────────
+class LogRequest(BaseModel):
+    inventory_item_id: int
+    plot_id: int
+    equipment_id: int
+    quantity_used: float
+    ai_estimated: bool = True
+    ai_estimate_corrected: bool = False
+    notes: str = ""
+
+
+# ── LOG SUBMISSION ────────────────────────────────────────────────────────────
+@app.post("/api/logs", status_code=201)
+def submit_log(
+    req: LogRequest,
+    current_user: SessionUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    item = db.query(InventoryItem).filter_by(id=req.inventory_item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Inventory item not found")
+
+    if (item.quantity_on_hand or 0) < req.quantity_used:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Insufficient stock: {item.quantity_on_hand} {item.unit} available"
+        )
+
+    try:
+        # 1. Deplete inventory
+        item.quantity_on_hand = (item.quantity_on_hand or 0) - req.quantity_used
+
+        # 2. Create usage log
+        plot = db.query(Plot).filter_by(id=req.plot_id).first()
+        log = UsageLog(
+            inventory_item_id=req.inventory_item_id,
+            plot_id=req.plot_id,
+            equipment_id=req.equipment_id,
+            logged_by=current_user["user_id"],
+            quantity_used=req.quantity_used,
+            log_date=datetime.now(timezone.utc),
+            ai_estimated=req.ai_estimated,
+            ai_estimate_corrected=req.ai_estimate_corrected,
+            notes=req.notes or None,
+        )
+        db.add(log)
+
+        # 3. Create activity log
+        plot_code = plot.plot_code if plot else f"plot#{req.plot_id}"
+        activity = ActivityLog(
+            user_id=current_user["user_id"],
+            session_id=current_user["session_id"],
+            action="log_usage",
+            detail=(
+                f"Logged {req.quantity_used} {item.unit} of '{item.name}' "
+                f"on plot {plot_code} "
+                f"[{'AI estimate' if req.ai_estimated and not req.ai_estimate_corrected else 'manual'}]"
+            ),
+            timestamp=datetime.now(timezone.utc),
+        )
+        db.add(activity)
+
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return {"status": "logged", "remaining_stock": item.quantity_on_hand}
 
 
 if __name__ == "__main__":

@@ -6,7 +6,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from api import app, get_db, sessions
-from models import Base, User, Farm, FarmMember, Field, Plot, Equipment, InventoryItem
+from models import Base, User, Farm, FarmMember, Field, Plot, Equipment, InventoryItem, UsageLog
 from werkzeug.security import generate_password_hash
 
 # ── IN-MEMORY DB FIXTURE ──────────────────────────────────────────────────────
@@ -158,7 +158,7 @@ def test_get_inventory_all(client, seeded_db):
     r = client.get("/api/inventory", headers=headers)
     assert r.status_code == 200
     items = r.json()
-    assert len(items) >= 1
+    assert len(items) == 1
     assert items[0]["name"] == "Test Herbicide"
 
 
@@ -211,4 +211,66 @@ def test_get_equipment(client, seeded_db):
 # ── PROTECTED ENDPOINT WITHOUT TOKEN ──────────────────────────────────────────
 def test_protected_endpoint_without_token(client, seeded_db):
     response = client.get("/api/fields")
-    assert response.status_code == 422  # missing required Authorization header
+    assert response.status_code == 401  # missing Authorization header
+
+
+# ── USAGE LOG SUBMISSION ──────────────────────────────────────────────────────
+def test_submit_log_depletes_inventory(client, seeded_db, db_session):
+    headers = auth_headers(client)
+    item_id = seeded_db["item"].id
+    plot_id = seeded_db["plot"].id
+    equip_id = seeded_db["equipment"].id
+    initial_qty = seeded_db["item"].quantity_on_hand  # 100.0
+
+    r = client.post("/api/logs", headers=headers, json={
+        "inventory_item_id": item_id,
+        "plot_id": plot_id,
+        "equipment_id": equip_id,
+        "quantity_used": 10.0,
+        "ai_estimated": True,
+        "ai_estimate_corrected": False,
+        "notes": "test log"
+    })
+    assert r.status_code == 201
+    assert r.json()["remaining_stock"] == initial_qty - 10.0
+
+    db_session.expire_all()
+    updated = db_session.query(InventoryItem).filter_by(id=item_id).first()
+    assert updated.quantity_on_hand == initial_qty - 10.0
+
+
+def test_submit_log_creates_usage_log(client, seeded_db, db_session):
+    headers = auth_headers(client)
+    item_id = seeded_db["item"].id
+
+    client.post("/api/logs", headers=headers, json={
+        "inventory_item_id": item_id,
+        "plot_id": seeded_db["plot"].id,
+        "equipment_id": seeded_db["equipment"].id,
+        "quantity_used": 5.0,
+        "ai_estimated": True,
+        "ai_estimate_corrected": False,
+        "notes": ""
+    })
+
+    db_session.expire_all()
+    log = db_session.query(UsageLog).filter_by(inventory_item_id=item_id).first()
+    assert log is not None
+    assert log.quantity_used == 5.0
+    assert log.ai_estimated is True
+
+
+def test_submit_log_insufficient_stock(client, seeded_db):
+    headers = auth_headers(client)
+
+    r = client.post("/api/logs", headers=headers, json={
+        "inventory_item_id": seeded_db["item"].id,
+        "plot_id": seeded_db["plot"].id,
+        "equipment_id": seeded_db["equipment"].id,
+        "quantity_used": 9999.0,
+        "ai_estimated": False,
+        "ai_estimate_corrected": False,
+        "notes": ""
+    })
+    assert r.status_code == 400
+    assert "Insufficient" in r.json()["detail"]
