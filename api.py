@@ -74,10 +74,35 @@ def get_current_user(authorization: str = Header(...)) -> SessionUser:
     return sessions[token]
 
 
+# ── PYDANTIC MODELS ───────────────────────────────────────────────────────────
+class LoginRequest(BaseModel):
+    nuid: str
+    password: str
+
+
 # ── HEALTH ────────────────────────────────────────────────────────────────────
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+# ── AUTH ENDPOINTS ────────────────────────────────────────────────────────────
+@app.post("/auth/login")
+def login(req: LoginRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter_by(nuid=req.nuid, is_active=True).first()
+    if not user or not check_password_hash(user.password_hash, req.password):
+        raise HTTPException(status_code=401, detail="Invalid NUID or password")
+    token = str(uuid.uuid4())
+    session_id = str(uuid.uuid4())
+    sessions[token] = SessionUser(user_id=user.id, name=user.name, session_id=session_id)
+    return {"token": token, "user_id": user.id, "name": user.name}
+
+
+@app.post("/auth/logout")
+def logout(authorization: str = Header(...), current_user: SessionUser = Depends(get_current_user)):
+    token = authorization.removeprefix("Bearer ").strip()
+    sessions.pop(token, None)
+    return {"status": "logged out"}
 
 
 if __name__ == "__main__":

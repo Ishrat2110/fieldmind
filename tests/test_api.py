@@ -3,17 +3,31 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
-from api import app, get_db
+from api import app, get_db, sessions
 from models import Base, User, Farm, FarmMember, Field, Plot, Equipment, InventoryItem
 from werkzeug.security import generate_password_hash
 
 # ── IN-MEMORY DB FIXTURE ──────────────────────────────────────────────────────
+# StaticPool ensures all connections share the same in-memory SQLite database.
 TEST_DB_URL = "sqlite:///:memory:"
+
+@pytest.fixture(autouse=True)
+def clear_sessions():
+    """Clear in-memory session store before each test to prevent state leakage."""
+    sessions.clear()
+    yield
+    sessions.clear()
+
 
 @pytest.fixture(scope="function")
 def db_session():
-    _engine = create_engine(TEST_DB_URL, connect_args={"check_same_thread": False})
+    _engine = create_engine(
+        TEST_DB_URL,
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
     Base.metadata.create_all(_engine)
     TestingSession = sessionmaker(bind=_engine)
     session = TestingSession()
@@ -90,3 +104,35 @@ def test_health(client):
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+# ── AUTH ──────────────────────────────────────────────────────────────────────
+def test_login_success(client, seeded_db):
+    response = client.post("/auth/login", json={"nuid": "11111111", "password": "testpass"})
+    assert response.status_code == 200
+    data = response.json()
+    assert "token" in data
+    assert data["name"] == "Test User"
+    assert "user_id" in data
+
+
+def test_login_wrong_password(client, seeded_db):
+    response = client.post("/auth/login", json={"nuid": "11111111", "password": "wrong"})
+    assert response.status_code == 401
+
+
+def test_login_unknown_nuid(client, seeded_db):
+    response = client.post("/auth/login", json={"nuid": "99999999", "password": "x"})
+    assert response.status_code == 401
+
+
+def test_logout(client, seeded_db):
+    login = client.post("/auth/login", json={"nuid": "11111111", "password": "testpass"})
+    token = login.json()["token"]
+    response = client.post("/auth/logout", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 200
+    assert response.json() == {"status": "logged out"}
+    # Verify token is removed from sessions store
+    # Try to log out again with same token - should get 401
+    response2 = client.post("/auth/logout", headers={"Authorization": f"Bearer {token}"})
+    assert response2.status_code == 401
