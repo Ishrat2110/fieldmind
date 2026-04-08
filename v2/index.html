@@ -422,6 +422,99 @@
   </div>
 </div>
 
+<!-- ── Usage Log Wizard ──────────────────────────────────────────── -->
+<div id="wizard-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:9000; align-items:center; justify-content:center;">
+  <div style="background:#111820; border:1px solid #1e2d3d; border-radius:14px; padding:36px; width:480px; max-width:94vw; max-height:90vh; overflow-y:auto;">
+
+    <!-- Header -->
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:28px;">
+      <h2 style="font-family:'Albert Sans',sans-serif; font-size:20px; font-weight:700; color:#fff; margin:0;">Log Usage</h2>
+      <button onclick="closeWizard()" style="background:none; border:none; color:#6b7a8d; font-size:20px; cursor:pointer; line-height:1; font-family:'Albert Sans',sans-serif;">✕</button>
+    </div>
+
+    <!-- Step indicators -->
+    <div style="display:flex; gap:8px; margin-bottom:28px;">
+      <div class="wstep" data-step="1" style="flex:1; height:4px; border-radius:2px; background:#F55014;"></div>
+      <div class="wstep" data-step="2" style="flex:1; height:4px; border-radius:2px; background:#1e2d3d;"></div>
+      <div class="wstep" data-step="3" style="flex:1; height:4px; border-radius:2px; background:#1e2d3d;"></div>
+      <div class="wstep" data-step="4" style="flex:1; height:4px; border-radius:2px; background:#1e2d3d;"></div>
+    </div>
+
+    <!-- Step 1: Select Item -->
+    <div id="wizard-step-1">
+      <p style="font-family:'Albert Sans',sans-serif; font-size:12px; font-weight:600; color:#8a9bb0; letter-spacing:.08em; text-transform:uppercase; margin:0 0 12px;">Step 1 — Select Item</p>
+      <div id="category-buttons" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;"></div>
+      <input id="item-search" type="text" placeholder="Search by name…"
+        style="width:100%; box-sizing:border-box; background:#080d10; border:1px solid #1e2d3d; border-radius:8px; padding:10px 14px; color:#fff; font-family:'Albert Sans',sans-serif; font-size:14px; outline:none; margin-bottom:8px;"
+        oninput="filterItems()"
+      />
+      <div id="item-list" style="max-height:200px; overflow-y:auto; border:1px solid #1e2d3d; border-radius:8px; background:#080d10;"></div>
+      <button onclick="wizardNext(2)" id="step1-next" disabled
+        style="margin-top:16px; width:100%; background:#F55014; color:#fff; border:none; border-radius:8px; padding:11px; font-family:'Albert Sans',sans-serif; font-size:14px; font-weight:700; cursor:pointer; opacity:.4; transition:opacity .15s;"
+      >Next →</button>
+    </div>
+
+    <!-- Step 2: Select Location -->
+    <div id="wizard-step-2" style="display:none;">
+      <p style="font-family:'Albert Sans',sans-serif; font-size:12px; font-weight:600; color:#8a9bb0; letter-spacing:.08em; text-transform:uppercase; margin:0 0 12px;">Step 2 — Select Location</p>
+      <label style="display:block; font-family:'Albert Sans',sans-serif; font-size:12px; color:#8a9bb0; margin-bottom:6px;">Field</label>
+      <select id="field-select" onchange="loadPlots()"
+        style="width:100%; background:#080d10; border:1px solid #1e2d3d; border-radius:8px; padding:10px 14px; color:#fff; font-family:'Albert Sans',sans-serif; font-size:14px; outline:none; margin-bottom:16px;">
+        <option value="">— Select field —</option>
+      </select>
+      <label style="display:block; font-family:'Albert Sans',sans-serif; font-size:12px; color:#8a9bb0; margin-bottom:6px;">Plot</label>
+      <select id="plot-select" onchange="onPlotSelect()"
+        style="width:100%; background:#080d10; border:1px solid #1e2d3d; border-radius:8px; padding:10px 14px; color:#fff; font-family:'Albert Sans',sans-serif; font-size:14px; outline:none; margin-bottom:16px;">
+        <option value="">— Select plot —</option>
+      </select>
+      <div style="display:flex; gap:10px;">
+        <button onclick="wizardNext(1)" style="flex:1; background:#1e2d3d; color:#fff; border:none; border-radius:8px; padding:11px; font-family:'Albert Sans',sans-serif; font-size:14px; cursor:pointer;">← Back</button>
+        <button onclick="wizardNext(3)" id="step2-next" disabled
+          style="flex:2; background:#F55014; color:#fff; border:none; border-radius:8px; padding:11px; font-family:'Albert Sans',sans-serif; font-size:14px; font-weight:700; cursor:pointer; opacity:.4;">Next →</button>
+      </div>
+    </div>
+
+    <!-- Step 3: Confirm Quantity -->
+    <div id="wizard-step-3" style="display:none;">
+      <p style="font-family:'Albert Sans',sans-serif; font-size:12px; font-weight:600; color:#8a9bb0; letter-spacing:.08em; text-transform:uppercase; margin:0 0 12px;">Step 3 — Confirm Quantity</p>
+      <label style="display:block; font-family:'Albert Sans',sans-serif; font-size:12px; color:#8a9bb0; margin-bottom:6px;">Equipment</label>
+      <select id="equipment-select" onchange="updateEstimate()"
+        style="width:100%; background:#080d10; border:1px solid #1e2d3d; border-radius:8px; padding:10px 14px; color:#fff; font-family:'Albert Sans',sans-serif; font-size:14px; outline:none; margin-bottom:16px;">
+        <option value="">— No equipment —</option>
+      </select>
+      <div id="estimate-hint" style="font-family:'Albert Sans',sans-serif; font-size:12px; color:#6b7a8d; margin-bottom:8px;"></div>
+      <label style="display:block; font-family:'Albert Sans',sans-serif; font-size:12px; color:#8a9bb0; margin-bottom:6px;">Quantity used <span id="qty-unit" style="color:#F55014;"></span></label>
+      <div style="position:relative;">
+        <input id="qty-input" type="number" step="0.1" min="0"
+          style="width:100%; box-sizing:border-box; background:#080d10; border:1px solid #1e2d3d; border-radius:8px; padding:10px 14px; color:#fff; font-family:'Albert Sans',sans-serif; font-size:14px; outline:none; margin-bottom:4px;"
+          oninput="onQtyEdit()"
+        />
+        <span id="manual-tag" style="display:none; position:absolute; right:12px; top:11px; font-size:11px; color:#F55014; font-family:'Albert Sans',sans-serif;">Manual entry</span>
+      </div>
+      <div style="display:flex; gap:10px; margin-top:16px;">
+        <button onclick="wizardNext(2)" style="flex:1; background:#1e2d3d; color:#fff; border:none; border-radius:8px; padding:11px; font-family:'Albert Sans',sans-serif; font-size:14px; cursor:pointer;">← Back</button>
+        <button onclick="wizardNext(4)"
+          style="flex:2; background:#F55014; color:#fff; border:none; border-radius:8px; padding:11px; font-family:'Albert Sans',sans-serif; font-size:14px; font-weight:700; cursor:pointer;">Next →</button>
+      </div>
+    </div>
+
+    <!-- Step 4: Confirm & Submit -->
+    <div id="wizard-step-4" style="display:none;">
+      <p style="font-family:'Albert Sans',sans-serif; font-size:12px; font-weight:600; color:#8a9bb0; letter-spacing:.08em; text-transform:uppercase; margin:0 0 12px;">Step 4 — Confirm & Submit</p>
+      <div id="summary-card" style="background:#080d10; border:1px solid #1e2d3d; border-radius:10px; padding:18px; margin-bottom:20px; font-family:'Albert Sans',sans-serif; font-size:14px; line-height:1.8; color:#c8d4e0;"></div>
+      <div style="display:flex; gap:10px;">
+        <button onclick="wizardNext(3)" style="flex:1; background:#1e2d3d; color:#fff; border:none; border-radius:8px; padding:11px; font-family:'Albert Sans',sans-serif; font-size:14px; cursor:pointer;">← Back</button>
+        <button onclick="submitLog()" id="submit-btn"
+          style="flex:2; background:#F55014; color:#fff; border:none; border-radius:8px; padding:11px; font-family:'Albert Sans',sans-serif; font-size:14px; font-weight:700; cursor:pointer;">Confirm & Log</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" style="display:none; position:fixed; bottom:28px; right:28px; background:#1a3a1a; border:1px solid #2d6a2d; color:#6fcf6f; padding:14px 22px; border-radius:10px; font-family:'Albert Sans',sans-serif; font-size:14px; z-index:9999; transition:opacity .3s;"></div>
+
   <!-- ═══════════════════════════════════════
        HOMEPAGE NAV (only shown on home)
   ═══════════════════════════════════════ -->
@@ -434,6 +527,12 @@
         <li><a href="#why-anchor" onclick="scrollToSection(event,'why-anchor')">Why FarmOS</a></li>
       </ul>
       <button class="home-nav-cta" onclick="navigate('dashboard')">Open App</button>
+      <button id="log-usage-btn" onclick="openWizard()"
+        style="background:#F55014; color:#fff; border:none; border-radius:8px; padding:8px 18px; font-family:'Albert Sans',sans-serif; font-size:13px; font-weight:700; cursor:pointer; margin-right:12px; transition:opacity .15s;"
+        onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'"
+        onmousedown="this.style.opacity='.7'" onmouseup="this.style.opacity='.85'"
+        onfocus="this.style.outline='2px solid #F55014'" onblur="this.style.outline='none'"
+      >+ Log Usage</button>
       <div id="user-nav" style="display:flex; align-items:center;"></div>
     </div>
   </nav>
@@ -1182,6 +1281,306 @@ window.addEventListener('DOMContentLoaded', () => {
   if (!getToken()) showLoginModal();
   else updateUserNav();
 });
+
+// ── Wizard State ──────────────────────────────────────────────────
+const wiz = {
+  selectedItem: null,
+  selectedPlot: null,
+  selectedField: null,
+  selectedEquipment: null,
+  quantity: 0,
+  aiEstimated: true,
+  aiCorrected: false,
+  allItems: [],
+  activeCategory: null,
+  estimatedQty: 0,
+};
+
+function openWizard() {
+  if (!getToken()) { showLoginModal(); return; }
+  resetWizard();
+  document.getElementById('wizard-overlay').style.display = 'flex';
+  loadWizardData();
+}
+
+function closeWizard() {
+  document.getElementById('wizard-overlay').style.display = 'none';
+}
+
+function resetWizard() {
+  Object.assign(wiz, {
+    selectedItem: null, selectedPlot: null, selectedField: null,
+    selectedEquipment: null, quantity: 0, aiEstimated: true,
+    aiCorrected: false, activeCategory: null, estimatedQty: 0,
+  });
+  const nxt = document.getElementById('step1-next');
+  if (nxt) { nxt.disabled = true; nxt.style.opacity = '.4'; }
+  const s = document.getElementById('item-search');
+  if (s) s.value = '';
+  wizardGoTo(1);
+}
+
+function wizardGoTo(step) {
+  [1,2,3,4].forEach(n => {
+    const el = document.getElementById(`wizard-step-${n}`);
+    if (el) el.style.display = n === step ? 'block' : 'none';
+    const ind = document.querySelector(`.wstep[data-step="${n}"]`);
+    if (ind) ind.style.background = n <= step ? '#F55014' : '#1e2d3d';
+  });
+}
+
+function wizardNext(step) {
+  if (step === 4) {
+    // Require equipment selection before advancing to step 4
+    const esel = document.getElementById('equipment-select');
+    if (!esel.value) {
+      showToast('Please select equipment before continuing.', true);
+      return;
+    }
+    buildSummary();
+  }
+  wizardGoTo(step);
+}
+
+// ── Step 1: Items ─────────────────────────────────────────────────
+async function loadWizardData() {
+  try {
+    const [ir, fr, er] = await Promise.all([
+      apiFetch('/api/inventory'),
+      apiFetch('/api/fields'),
+      apiFetch('/api/equipment'),
+    ]);
+    wiz.allItems = await ir.json();
+    buildCategoryButtons();
+    renderItemList(wiz.allItems);
+
+    const fields = await fr.json();
+    const fsel = document.getElementById('field-select');
+    fsel.innerHTML = '<option value="">— Select field —</option>' +
+      fields.map(f => `<option value="${f.id}" data-name="${f.name}">${f.name} (${f.area_ha} ha)</option>`).join('');
+
+    const equip = await er.json();
+    const esel = document.getElementById('equipment-select');
+    esel.innerHTML = '<option value="">— No equipment —</option>' +
+      equip.map(e => `<option value="${e.id}" data-rate="${e.chemical_rate_l_per_ha || 0}">${e.name}</option>`).join('');
+  } catch (e) {
+    console.error('Failed to load wizard data', e);
+  }
+}
+
+const CATEGORIES = ['herbicide', 'seed', 'fuel', 'fungicide', 'fertilizer', 'other'];
+
+function buildCategoryButtons() {
+  const container = document.getElementById('category-buttons');
+  container.innerHTML = '';
+  const allBtn = document.createElement('button');
+  allBtn.textContent = 'All';
+  allBtn.onclick = () => setCategoryFilter(null, allBtn);
+  styleTabBtn(allBtn, true);
+  container.appendChild(allBtn);
+
+  const present = [...new Set(wiz.allItems.map(i => i.category).filter(Boolean))];
+  CATEGORIES.filter(c => present.includes(c)).forEach(cat => {
+    const btn = document.createElement('button');
+    btn.textContent = cat.charAt(0).toUpperCase() + cat.slice(1);
+    btn.onclick = () => setCategoryFilter(cat, btn);
+    styleTabBtn(btn, false);
+    container.appendChild(btn);
+  });
+}
+
+function styleTabBtn(btn, active) {
+  btn.style.cssText = `background:${active ? '#F55014' : '#1e2d3d'}; color:#fff; border:none; border-radius:6px; padding:6px 14px; font-family:'Albert Sans',sans-serif; font-size:12px; font-weight:600; cursor:pointer; transition:background .15s;`;
+}
+
+function setCategoryFilter(cat, btnEl) {
+  wiz.activeCategory = cat;
+  document.querySelectorAll('#category-buttons button').forEach(b => styleTabBtn(b, false));
+  styleTabBtn(btnEl, true);
+  filterItems();
+}
+
+function filterItems() {
+  const search = document.getElementById('item-search').value.toLowerCase();
+  let filtered = wiz.allItems;
+  if (wiz.activeCategory) filtered = filtered.filter(i => i.category === wiz.activeCategory);
+  if (search) filtered = filtered.filter(i => i.name.toLowerCase().includes(search));
+  renderItemList(filtered);
+}
+
+function renderItemList(items) {
+  const container = document.getElementById('item-list');
+  if (!items.length) {
+    container.innerHTML = '<div style="padding:12px 14px; color:#6b7a8d; font-family:\'Albert Sans\',sans-serif; font-size:13px;">No items found</div>';
+    return;
+  }
+  container.innerHTML = items.map(item => `
+    <div onclick="selectItem(${item.id})" data-item-id="${item.id}"
+      style="padding:10px 14px; cursor:pointer; border-bottom:1px solid #1e2d3d; font-family:'Albert Sans',sans-serif; transition:background .1s;"
+      onmouseover="this.style.background='#1e2d3d'" onmouseout="this.style.background='${wiz.selectedItem && wiz.selectedItem.id===item.id ? '#1e2d3d' : 'transparent'}'">
+      <div style="font-size:14px; color:#fff;">${item.name}</div>
+      <div style="font-size:12px; color:#6b7a8d;">${item.category} · ${item.quantity_on_hand} ${item.unit} in stock</div>
+    </div>
+  `).join('');
+  if (wiz.selectedItem) highlightSelectedItem();
+}
+
+function highlightSelectedItem() {
+  document.querySelectorAll('#item-list [data-item-id]').forEach(el => {
+    const isSelected = wiz.selectedItem && el.dataset.itemId == wiz.selectedItem.id;
+    el.style.background = isSelected ? '#1e2d3d' : 'transparent';
+    el.style.borderLeft = isSelected ? '3px solid #F55014' : '3px solid transparent';
+  });
+}
+
+function selectItem(itemId) {
+  wiz.selectedItem = wiz.allItems.find(i => i.id === itemId);
+  highlightSelectedItem();
+  const btn = document.getElementById('step1-next');
+  btn.disabled = false;
+  btn.style.opacity = '1';
+  document.getElementById('qty-unit').textContent = `(${wiz.selectedItem.unit})`;
+}
+
+// ── Step 2: Location ──────────────────────────────────────────────
+async function loadPlots() {
+  const fsel = document.getElementById('field-select');
+  const fieldId = fsel.value;
+  const opt = fsel.options[fsel.selectedIndex];
+  wiz.selectedField = fieldId ? { id: parseInt(fieldId), name: opt.dataset.name } : null;
+  const psel = document.getElementById('plot-select');
+  psel.innerHTML = '<option value="">— Select plot —</option>';
+  wiz.selectedPlot = null;
+  const btn = document.getElementById('step2-next');
+  btn.disabled = true; btn.style.opacity = '.4';
+  if (!fieldId) return;
+  try {
+    const r = await apiFetch(`/api/plots?field_id=${fieldId}`);
+    const plots = await r.json();
+    psel.innerHTML = '<option value="">— Select plot —</option>' +
+      plots.map(p => `<option value="${p.id}" data-code="${p.plot_code}" data-area="${p.area_ha}">${p.plot_code} (${p.area_ha} ha)</option>`).join('');
+  } catch (e) { console.error(e); }
+}
+
+function onPlotSelect() {
+  const sel = document.getElementById('plot-select');
+  const opt = sel.options[sel.selectedIndex];
+  wiz.selectedPlot = sel.value ? { id: parseInt(sel.value), plot_code: opt.dataset.code, area_ha: parseFloat(opt.dataset.area) } : null;
+  const btn = document.getElementById('step2-next');
+  btn.disabled = !wiz.selectedPlot;
+  btn.style.opacity = wiz.selectedPlot ? '1' : '.4';
+}
+
+// ── Step 3: Quantity ──────────────────────────────────────────────
+function updateEstimate() {
+  const esel = document.getElementById('equipment-select');
+  const opt = esel.options[esel.selectedIndex];
+  const rate = esel.value ? parseFloat(opt.dataset.rate) : 0;
+  wiz.selectedEquipment = esel.value ? { id: parseInt(esel.value), chemical_rate_l_per_ha: rate } : null;
+
+  const area = wiz.selectedPlot ? wiz.selectedPlot.area_ha : 0;
+  const isSeed = wiz.selectedItem && wiz.selectedItem.category === 'seed';
+  const hint = document.getElementById('estimate-hint');
+  const input = document.getElementById('qty-input');
+
+  if (!isSeed && rate > 0 && area > 0) {
+    const est = +(rate * area).toFixed(2);
+    wiz.estimatedQty = est;
+    wiz.quantity = est;
+    wiz.aiEstimated = true;
+    wiz.aiCorrected = false;
+    input.value = est;
+    input.dataset.estimate = est;
+    hint.textContent = `Estimated: ${rate} L/ha × ${area} ha = ${est} ${wiz.selectedItem ? wiz.selectedItem.unit : ''}`;
+    document.getElementById('manual-tag').style.display = 'none';
+  } else {
+    wiz.estimatedQty = 0;
+    wiz.quantity = 0;
+    input.value = '';
+    hint.textContent = isSeed ? 'Seeds: enter quantity manually.' : 'Select equipment with a chemical rate to auto-estimate.';
+    document.getElementById('manual-tag').style.display = 'none';
+  }
+}
+
+function onQtyEdit() {
+  const input = document.getElementById('qty-input');
+  const val = parseFloat(input.value);
+  if (!isNaN(val)) {
+    wiz.quantity = val;
+    const wasEstimated = wiz.aiEstimated && !wiz.aiCorrected;
+    if (wasEstimated && wiz.estimatedQty > 0 && val !== wiz.estimatedQty) {
+      wiz.aiCorrected = true;
+      document.getElementById('manual-tag').style.display = 'inline';
+    }
+  }
+}
+
+// ── Step 4: Summary & Submit ──────────────────────────────────────
+function buildSummary() {
+  const user = getUser();
+  const esel = document.getElementById('equipment-select');
+  const equipName = esel.value ? esel.options[esel.selectedIndex].text : 'None';
+  document.getElementById('summary-card').innerHTML = `
+    <div><span style="color:#6b7a8d;">Item:</span> ${wiz.selectedItem ? wiz.selectedItem.name : '—'}</div>
+    <div><span style="color:#6b7a8d;">Field:</span> ${wiz.selectedField ? wiz.selectedField.name : '—'}</div>
+    <div><span style="color:#6b7a8d;">Plot:</span> ${wiz.selectedPlot ? wiz.selectedPlot.plot_code : '—'} (${wiz.selectedPlot ? wiz.selectedPlot.area_ha : '—'} ha)</div>
+    <div><span style="color:#6b7a8d;">Quantity:</span> ${wiz.quantity} ${wiz.selectedItem ? wiz.selectedItem.unit : ''}</div>
+    <div><span style="color:#6b7a8d;">Equipment:</span> ${equipName}</div>
+    <div><span style="color:#6b7a8d;">Logged by:</span> ${user ? user.name : '—'}</div>
+    <div><span style="color:#6b7a8d;">Estimate type:</span> ${wiz.aiCorrected ? 'Manual override' : wiz.aiEstimated ? 'AI estimated' : 'Manual'}</div>
+  `;
+}
+
+async function submitLog() {
+  if (!wiz.selectedItem || !wiz.selectedPlot || wiz.quantity <= 0) {
+    showToast('Please complete all fields before submitting.', true);
+    return;
+  }
+  if (!wiz.selectedEquipment) {
+    showToast('Please select equipment before submitting.', true);
+    return;
+  }
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true; btn.textContent = 'Logging…';
+  try {
+    const r = await apiFetch('/api/logs', {
+      method: 'POST',
+      body: JSON.stringify({
+        inventory_item_id: wiz.selectedItem.id,
+        plot_id: wiz.selectedPlot.id,
+        equipment_id: wiz.selectedEquipment.id,
+        quantity_used: wiz.quantity,
+        ai_estimated: wiz.aiEstimated,
+        ai_estimate_corrected: wiz.aiCorrected,
+        notes: '',
+      }),
+    });
+    if (!r.ok) {
+      const err = await r.json();
+      showToast(`Error: ${err.detail}`, true);
+    } else {
+      closeWizard();
+      showToast('Logged successfully');
+    }
+  } catch (e) {
+    if (e.message !== 'Unauthorized') showToast('Failed to submit. Check API server.', true);
+  }
+  btn.disabled = false; btn.textContent = 'Confirm & Log';
+}
+
+function showToast(msg, isError = false) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.style.background = isError ? '#3a1a1a' : '#1a3a1a';
+  el.style.borderColor = isError ? '#6a2d2d' : '#2d6a2d';
+  el.style.color = isError ? '#cf6f6f' : '#6fcf6f';
+  el.style.display = 'block';
+  el.style.opacity = '1';
+  setTimeout(() => {
+    el.style.opacity = '0';
+    setTimeout(() => { el.style.display = 'none'; }, 300);
+  }, 3000);
+}
 </script>
 
 </body>
