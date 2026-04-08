@@ -4,9 +4,10 @@ api.py
 FastAPI backend for the FarmOS usage logging wizard.
 Run with: python3 api.py  (starts on http://localhost:8000)
 """
+import os
 import uuid
 from datetime import datetime, timezone
-from typing import Optional
+from typing import TypedDict
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Depends, Header
@@ -22,16 +23,25 @@ from models import (
 from werkzeug.security import check_password_hash
 
 # ── DB ────────────────────────────────────────────────────────────────────────
-DATABASE_URL = "sqlite:////Users/ishratjandu/AI_Pitla/results/farm_manager.db"
+DATABASE_URL = os.environ.get(
+    "DATABASE_URL",
+    "sqlite:////Users/ishratjandu/AI_Pitla/results/farm_manager.db"
+)
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(bind=engine)
 
+# Single-farm deployment assumption; used by inventory/log endpoints
 FARM_ID = 1
 
+
 # ── SESSION STORE ─────────────────────────────────────────────────────────────
-# In-memory: token -> {user_id, name, session_id}
-# Cleared on process restart (satisfies tab-session requirement)
-sessions: dict[str, dict] = {}
+class SessionUser(TypedDict):
+    user_id: int
+    name: str
+    session_id: str
+
+# In-memory: token -> SessionUser; cleared on process restart (tab-session contract)
+sessions: dict[str, SessionUser] = {}
 
 # ── APP ───────────────────────────────────────────────────────────────────────
 app = FastAPI(title="FarmOS API")
@@ -55,7 +65,7 @@ def get_db():
 
 
 # ── AUTH DEPENDENCY ───────────────────────────────────────────────────────────
-def get_current_user(authorization: str = Header(...)) -> dict:
+def get_current_user(authorization: str = Header(...)) -> SessionUser:
     if not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Invalid authorization header")
     token = authorization.removeprefix("Bearer ").strip()

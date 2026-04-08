@@ -13,22 +13,20 @@ TEST_DB_URL = "sqlite:///:memory:"
 
 @pytest.fixture(scope="function")
 def db_session():
-    engine = create_engine(TEST_DB_URL, connect_args={"check_same_thread": False})
-    Base.metadata.create_all(engine)
-    TestingSession = sessionmaker(bind=engine)
+    _engine = create_engine(TEST_DB_URL, connect_args={"check_same_thread": False})
+    Base.metadata.create_all(_engine)
+    TestingSession = sessionmaker(bind=_engine)
     session = TestingSession()
     yield session
     session.close()
-    Base.metadata.drop_all(engine)
+    Base.metadata.drop_all(_engine)
+    _engine.dispose()
 
 
 @pytest.fixture(scope="function")
 def client(db_session):
     def override_get_db():
-        try:
-            yield db_session
-        finally:
-            pass
+        yield db_session
     app.dependency_overrides[get_db] = override_get_db
     with TestClient(app) as c:
         yield c
