@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Sign In — UNL Field Manager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+
+:root {
+  --bg:        #0C0B09;
+  --surface:   #131108;
+  --surface-2: #1B1915;
+  --border:    #222018;
+  --border-2:  #302C22;
+  --text:      #EDE8D9;
+  --text-2:    #978D7A;
+  --text-3:    #554D3F;
+  --gold:      #C8963C;
+  --gold-dim:  rgba(200,150,60,0.10);
+  --gold-mid:  rgba(200,150,60,0.25);
+  --gold-glow: rgba(200,150,60,0.20);
+  --red:       #BF3F2E;
+  --red-dim:   rgba(191,63,46,0.12);
+  --r:         5px;
+  --mono:      'IBM Plex Mono', ui-monospace, monospace;
+  --serif:     'Playfair Display', Georgia, serif;
+  --sans:      'DM Sans', system-ui, sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13.5px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ── LEFT PANEL ───────────────────────────── */
+.login-left {
+  width: 420px;
+  flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 48px 52px;
+}
+
+.login-logo-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 56px;
+}
+
+.login-icon {
+  width: 38px; height: 38px;
+  background: var(--gold-dim);
+  border: 1px solid var(--gold-mid);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--gold);
+}
+
+.login-wordmark {
+  font-family: var(--serif);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.login-headline {
+  font-family: var(--serif);
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  margin-bottom: 8px;
+}
+
+.login-tagline {
+  font-size: 13px;
+  color: var(--text-3);
+  margin-bottom: 40px;
+  font-family: var(--mono);
+}
+
+.error-msg {
+  background: var(--red-dim);
+  border: 1px solid rgba(191,63,46,0.2);
+  color: var(--red);
+  border-radius: var(--r);
+  padding: 10px 14px;
+  font-size: 11px;
+  font-family: var(--mono);
+  margin-bottom: 20px;
+}
+
+.field { display: flex; flex-direction: column; gap: 7px; margin-bottom: 18px; }
+
+label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  font-family: var(--mono);
+}
+
+input {
+  padding: 10px 14px;
+  border: 1px solid var(--border-2);
+  border-radius: var(--r);
+  font-size: 13.5px;
+  color: var(--text);
+  background: var(--surface-2);
+  font-family: var(--sans);
+  transition: border-color 150ms, box-shadow 150ms;
+  width: 100%;
+  color-scheme: dark;
+}
+input:focus {
+  outline: none;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(200,150,60,0.12);
+}
+
+.btn-signin {
+  width: 100%;
+  padding: 12px;
+  background: var(--gold);
+  color: #fff;
+  border: none;
+  border-radius: var(--r);
+  font-size: 13.5px;
+  font-weight: 600;
+  font-family: var(--sans);
+  cursor: pointer;
+  margin-top: 6px;
+  transition: background 130ms, box-shadow 130ms;
+  letter-spacing: 0.01em;
+}
+.btn-signin:hover {
+  background: #B5842F;
+  box-shadow: 0 4px 20px var(--gold-glow);
+}
+
+.login-note {
+  margin-top: 28px;
+  font-size: 10px;
+  color: var(--text-3);
+  font-family: var(--mono);
+  line-height: 1.6;
+}
+
+.login-footer {
+  margin-top: auto;
+  padding-top: 32px;
+  font-size: 10px;
+  color: var(--text-3);
+  font-family: var(--mono);
+  border-top: 1px solid var(--border);
+}
+
+/* ── RIGHT PANEL ──────────────────────────── */
+.login-right {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Subtle field-row background pattern */
+.login-right::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 48px,
+      rgba(200,150,60,0.03) 48px,
+      rgba(200,150,60,0.03) 49px
+    );
+  pointer-events: none;
+}
+
+.login-right-content {
+  position: relative;
+  max-width: 480px;
+  text-align: center;
+}
+
+.login-stat-group {
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+  align-items: center;
+}
+
+.login-stat {
+  text-align: center;
+}
+
+.login-stat-num {
+  font-family: var(--serif);
+  font-size: 72px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: var(--gold);
+  opacity: 0.25;
+  margin-bottom: 8px;
+}
+
+.login-stat-lbl {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  font-family: var(--mono);
+}
+
+.login-quote {
+  font-family: var(--serif);
+  font-size: 18px;
+  font-style: italic;
+  color: var(--text-3);
+  line-height: 1.6;
+  max-width: 340px;
+  opacity: 0.6;
+}
+
+.login-institution {
+  font-size: 10px;
+  color: var(--text-3);
+  font-family: var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-top: 16px;
+  opacity: 0.5;
+}
+
+</style>
+</head>
+<body>
+
+<!-- Left: Sign-in form -->
+<div class="login-left">
+
+  <div class="login-logo-row">
+    <div class="login-icon">
+      <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M3 7h18M3 12h18M3 17h18"/>
+        <circle cx="7" cy="7" r="1.5" fill="currentColor" stroke="none"/>
+        <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/>
+        <circle cx="17" cy="17" r="1.5" fill="currentColor" stroke="none"/>
+      </svg>
+    </div>
+    <div class="login-wordmark">Field Manager</div>
+  </div>
+
+  <div class="login-headline">Welcome back.</div>
+  <div class="login-tagline">Sign in to access your research farm.</div>
+
+  {% if error %}
+  <div class="error-msg">{{ error }}</div>
+  {% endif %}
+
+  <form method="POST" action="{{ url_for('login') }}">
+    <div class="field">
+      <label>NUID or UNL Email</label>
+      <input type="text" name="identifier"
+             placeholder="12345678 or name@unl.edu"
+             autocomplete="username" autofocus required>
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" name="password" autocomplete="current-password" required>
+    </div>
+    <button type="submit" class="btn-signin">Sign In</button>
+  </form>
+
+  <div class="login-note">
+    Access is restricted to authorized UNL accounts.<br>
+    Contact your farm administrator if you need access.
+  </div>
+
+  <div class="login-footer">
+    University of Nebraska–Lincoln · Research Farm Systems
+  </div>
+
+</div>
+
+<!-- Right: Decorative panel -->
+<div class="login-right">
+  <div class="login-right-content">
+    <div class="login-quote">
+      "Precision measurement is the foundation of sound agricultural science."
+    </div>
+    <div class="login-institution">University of Nebraska–Lincoln</div>
+  </div>
+</div>
+
+</body>
+</html>

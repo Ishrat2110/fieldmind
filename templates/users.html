@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Users{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-title">Users</div>
+    <div class="page-sub">{{ users | length }} registered account{{ 's' if users | length != 1 }}</div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>NUID</th>
+          <th>Email</th>
+          <th>Role</th>
+          <th>Status</th>
+          <th>Created</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in users %}
+        <tr>
+          <td>
+            <span style="font-weight:500;">{{ u.name }}</span>
+            {% if u.id == current_user_id %}<span class="badge badge-blue" style="margin-left:6px;">you</span>{% endif %}
+          </td>
+          <td class="mono">{{ u.nuid or '—' }}</td>
+          <td class="dim">{{ u.email }}</td>
+          <td>
+            {% if u.role.value == 'admin' %}
+              <span class="badge badge-red">admin</span>
+            {% elif u.role.value == 'manager' %}
+              <span class="badge badge-amber">manager</span>
+            {% else %}
+              <span class="badge badge-gray">viewer</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if u.is_active %}
+              <span class="badge badge-green">active</span>
+            {% else %}
+              <span class="badge badge-gray">inactive</span>
+            {% endif %}
+          </td>
+          <td class="dim2">{{ u.created_at.strftime('%b %d, %Y') if u.created_at else '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

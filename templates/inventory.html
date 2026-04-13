@@ -1,0 +1,262 @@
+{% extends "base.html" %}
+{% block title %}Inventory{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <div class="page-title">Inventory</div>
+    <div class="page-sub">{{ inventory | length }} items tracked</div>
+  </div>
+</div>
+
+<!-- Stats -->
+{% set critical_items = inventory | selectattr('_status','equalto','critical') | list %}
+{% set warning_items  = inventory | selectattr('_status','equalto','warning')  | list %}
+{% set ok_items       = inventory | selectattr('_status','equalto','ok')       | list %}
+
+<div class="stats-row">
+  <div class="stat-card">
+    <div class="stat-label">Total Items</div>
+    <div class="stat-value">{{ inventory | length }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Critical</div>
+    <div class="stat-value {% if critical_items %}red{% endif %}">{{ critical_items | length }}</div>
+    <div class="stat-sub">below 50% of threshold</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Low</div>
+    <div class="stat-value {% if warning_items %}amber{% endif %}">{{ warning_items | length }}</div>
+    <div class="stat-sub">below reorder point</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Healthy</div>
+    <div class="stat-value green">{{ ok_items | length }}</div>
+  </div>
+</div>
+
+<!-- Stock levels -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-title">Stock Levels</span>
+    <span class="section-count">sorted by urgency</span>
+  </div>
+  {% for item in inventory %}
+  {% set max_val = [item.quantity_on_hand, item.reorder_threshold * 3] | max if item.reorder_threshold else item.quantity_on_hand %}
+  {% set pct = [(item.quantity_on_hand / max_val * 100) | int, 100] | min if max_val > 0 else 0 %}
+  {% set color = 'var(--red)' if item._status == 'critical' else ('var(--amber)' if item._status == 'warning' else 'var(--green)') %}
+  <div style="display:flex; align-items:center; gap:20px; padding: 11px 0; border-bottom: 1px solid var(--border);">
+    <div style="width:180px; flex-shrink:0;">
+      <div style="font-size:13px; font-weight:500;">{{ item.name }}</div>
+      <div style="font-size:10px; color:var(--text-3); font-family:var(--mono); margin-top:1px;">{{ item.category if item.category else '—' }}</div>
+    </div>
+    <div style="flex:1;">
+      <div class="bar-track">
+        <div class="bar-fill" style="width:{{ pct }}%; background:{{ color }};"></div>
+      </div>
+    </div>
+    <div style="width:160px; text-align:right; font-family:var(--mono); font-size:11px; color:var(--text-2); flex-shrink:0;">
+      {{ item.quantity_on_hand | round(1) }} / {{ (item.reorder_threshold * 3) | round(0) | int }} {{ item.unit }}
+    </div>
+    <div style="width:80px; text-align:right; font-family:var(--mono); font-size:11px; color:var(--text-3); flex-shrink:0;">
+      {% if item._days %}~{{ item._days }}d{% else %}—{% endif %}
+    </div>
+    <div style="width:70px; text-align:right; flex-shrink:0;">
+      <span class="badge {% if item._status=='critical' %}badge-red{% elif item._status=='warning' %}badge-amber{% else %}badge-green{% endif %}">
+        {{ item._status }}
+      </span>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Full table -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-title">All Items</span>
+    <input id="inv-search" type="search" placeholder="Search…" style="width:180px; padding:4px 9px; font-size:12px;" oninput="filterInventory(this.value)">
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Item</th><th>Category</th><th>On Hand</th><th>Unit</th>
+          <th>7d Trend</th><th>Days Left</th><th>Reorder At</th><th>Reorder Qty</th>
+          <th>Supplier</th><th>Unit Cost</th><th>Status</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in inventory %}
+        <tr data-name="{{ item.name | lower }} {{ item.category | lower }} {{ item.supplier | lower if item.supplier else '' }}">
+          <td style="font-weight:500;">{{ item.name }}</td>
+          <td class="dim2">{{ item.category | capitalize if item.category else '—' }}</td>
+          <td class="mono">{{ item.quantity_on_hand | round(1) }}</td>
+          <td class="dim2">{{ item.unit }}</td>
+          <td style="padding:6px 12px;">{{ item._spark }}</td>
+          <td class="mono">{{ item._days if item._days else '—' }}</td>
+          <td class="mono dim">{{ item.reorder_threshold }}</td>
+          <td class="mono dim">{{ item.reorder_quantity }}</td>
+          <td class="dim">{{ item.supplier or '—' }}</td>
+          <td class="mono dim2">{% if item.unit_cost %}${{ item.unit_cost }}{% else %}—{% endif %}</td>
+          <td>
+            <span class="badge {% if item._status=='critical' %}badge-red{% elif item._status=='warning' %}badge-amber{% else %}badge-green{% endif %}">
+              {{ item._status }}
+            </span>
+          </td>
+          <td style="white-space:nowrap;">
+            <button class="btn btn-xs btn-ghost"
+              onclick="openEditModal(this)"
+              data-id="{{ item.id }}"
+              data-name="{{ item.name }}"
+              data-category="{{ item.category or '' }}"
+              data-unit="{{ item.unit }}"
+              data-qty="{{ item.quantity_on_hand }}"
+              data-threshold="{{ item.reorder_threshold or 0 }}"
+              data-reorder="{{ item.reorder_quantity or 0 }}"
+              data-supplier="{{ item.supplier or '' }}"
+              data-cost="{{ item.unit_cost or '' }}">Edit</button>
+            <form method="POST" action="{{ url_for('inventory_delete', iid=item.id) }}" style="display:inline;" onsubmit="return confirm('Delete {{ item.name }}? This will also delete all usage logs for this item.')">
+              <button class="btn btn-xs btn-danger" type="submit">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Add item -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-title">Add Item</span>
+  </div>
+  <form method="POST" action="{{ url_for('inventory_add') }}">
+    <div class="form-grid form-grid-3" style="margin-bottom:16px;">
+      <div class="field">
+        <label>Item Name *</label>
+        <input type="text" name="name" required placeholder="e.g. Roundup">
+      </div>
+      <div class="field">
+        <label>Category</label>
+        <select name="category">
+          <option>fertilizer</option><option>herbicide</option><option>fungicide</option>
+          <option>fuel</option><option>seed</option><option>lubricant</option><option>other</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Unit *</label>
+        <input type="text" name="unit" required placeholder="kg, L, bags…">
+      </div>
+      <div class="field">
+        <label>On Hand</label>
+        <input type="number" name="qty" step="0.1" min="0" value="0">
+      </div>
+      <div class="field">
+        <label>Reorder Threshold</label>
+        <input type="number" name="threshold" step="0.1" min="0" value="0">
+      </div>
+      <div class="field">
+        <label>Reorder Quantity</label>
+        <input type="number" name="reorder_qty" step="0.1" min="0" value="0">
+      </div>
+      <div class="field">
+        <label>Supplier</label>
+        <input type="text" name="supplier" placeholder="Optional">
+      </div>
+      <div class="field">
+        <label>Unit Cost ($)</label>
+        <input type="number" name="unit_cost" step="0.01" min="0" placeholder="0.00">
+      </div>
+    </div>
+    <button type="submit" class="btn btn-primary">Add Item</button>
+  </form>
+</div>
+
+<!-- Edit modal -->
+<div id="edit-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:200; align-items:center; justify-content:center;">
+  <div style="background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:28px; width:520px; max-width:90vw;">
+    <div style="font-size:14px; font-weight:600; margin-bottom:20px;">Edit Inventory Item</div>
+    <form id="edit-form" method="POST">
+      <div class="form-grid form-grid-3" style="margin-bottom:16px;">
+        <div class="field" style="grid-column:1/-1;">
+          <label for="edit-name">Item Name *</label>
+          <input id="edit-name" type="text" name="name" required>
+        </div>
+        <div class="field">
+          <label for="edit-category">Category</label>
+          <select id="edit-category" name="category">
+            <option value="fertilizer">fertilizer</option>
+            <option value="herbicide">herbicide</option>
+            <option value="fungicide">fungicide</option>
+            <option value="fuel">fuel</option>
+            <option value="seed">seed</option>
+            <option value="lubricant">lubricant</option>
+            <option value="other">other</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="edit-unit">Unit *</label>
+          <input id="edit-unit" type="text" name="unit" required>
+        </div>
+        <div class="field">
+          <label for="edit-qty">On Hand</label>
+          <input id="edit-qty" type="number" name="qty" step="0.1" min="0">
+        </div>
+        <div class="field">
+          <label for="edit-threshold">Reorder Threshold</label>
+          <input id="edit-threshold" type="number" name="threshold" step="0.1" min="0">
+        </div>
+        <div class="field">
+          <label for="edit-reorder">Reorder Quantity</label>
+          <input id="edit-reorder" type="number" name="reorder_qty" step="0.1" min="0">
+        </div>
+        <div class="field">
+          <label for="edit-supplier">Supplier</label>
+          <input id="edit-supplier" type="text" name="supplier">
+        </div>
+        <div class="field">
+          <label for="edit-cost">Unit Cost ($)</label>
+          <input id="edit-cost" type="number" name="unit_cost" step="0.01" min="0">
+        </div>
+      </div>
+      <div style="display:flex; gap:10px; justify-content:flex-end;">
+        <button type="button" class="btn btn-ghost" onclick="closeEditModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openEditModal(btn) {
+  const d = btn.dataset;
+  document.getElementById('edit-form').action     = '/inventory/' + d.id + '/edit';
+  document.getElementById('edit-name').value      = d.name || '';
+  document.getElementById('edit-category').value  = d.category || 'other';
+  document.getElementById('edit-unit').value      = d.unit || '';
+  document.getElementById('edit-qty').value       = d.qty || 0;
+  document.getElementById('edit-threshold').value = d.threshold || 0;
+  document.getElementById('edit-reorder').value   = d.reorder || 0;
+  document.getElementById('edit-supplier').value  = d.supplier || '';
+  document.getElementById('edit-cost').value      = d.cost || '';
+  const modal = document.getElementById('edit-modal');
+  modal.style.display = 'flex';
+}
+function closeEditModal() {
+  document.getElementById('edit-modal').style.display = 'none';
+}
+document.getElementById('edit-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeEditModal();
+});
+
+function filterInventory(q) {
+  q = q.toLowerCase();
+  document.querySelectorAll('table tbody tr[data-name]').forEach(row => {
+    row.style.display = row.dataset.name.includes(q) ? '' : 'none';
+  });
+}
+</script>
+
+{% endblock %}

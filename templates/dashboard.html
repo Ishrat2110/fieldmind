@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+{% block title %}Overview{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <div class="page-title">Overview</div>
+    <div class="page-sub">{{ farm.name if farm else 'Research Farm' }}{% if farm and farm.total_area_ha %} · {{ farm.total_area_ha }} ha active{% endif %}</div>
+  </div>
+  <div class="page-aside" id="today-date"></div>
+</div>
+
+<!-- Stats Strip -->
+<div class="stats-strip">
+  <div class="stat-block">
+    <div class="stat-num {% if overdue %}red{% endif %}">{{ overdue | length }}</div>
+    <div class="stat-lbl">Overdue</div>
+    <div class="stat-detail">treatments past due</div>
+  </div>
+  <div class="stat-block">
+    <div class="stat-num {% if critical_count %}red{% elif warning_count %}amber{% else %}green{% endif %}">{{ critical_count }}</div>
+    <div class="stat-lbl">Critical Stock</div>
+    <div class="stat-detail">{{ warning_count }} low · {{ (inventory | selectattr('_status','equalto','ok') | list) | length }} ok</div>
+  </div>
+  <div class="stat-block">
+    <div class="stat-num">{{ upcoming | length }}</div>
+    <div class="stat-lbl">Due This Week</div>
+    <div class="stat-detail">next 7 days</div>
+  </div>
+  <div class="stat-block">
+    <div class="stat-num {% if today_logs %}green{% endif %}">{{ today_logs | length }}</div>
+    <div class="stat-lbl">Logged Today</div>
+    <div class="stat-detail">{% if today_logs %}entries recorded{% else %}none recorded yet{% endif %}</div>
+  </div>
+  <div class="stat-block">
+    <div class="stat-num gold">{{ plots_count }}</div>
+    <div class="stat-lbl">Active Plots</div>
+    <div class="stat-detail">{{ farm.total_area_ha if farm else '—' }} ha total area</div>
+  </div>
+</div>
+
+<!-- Top row: Attention + Chart -->
+<div class="grid-2" style="margin-bottom:36px;">
+
+  <div class="section">
+    <div class="section-head">
+      <div class="section-title">Needs Attention</div>
+      {% if overdue %}
+      <a href="{{ url_for('treatments') }}" class="section-link">View all →</a>
+      {% endif %}
+    </div>
+
+    {% if overdue or critical_count or warning_count %}
+    <div>
+      {% for t in overdue %}
+      {% set unit = t.inventory_item.unit if t.inventory_item else '' %}
+      {% set total = (t.rate_per_ha * t.plot.area_ha) | round(2) if t.plot and t.plot.area_ha else '—' %}
+      <div class="alert-row">
+        <div class="alert-stripe stripe-red"></div>
+        <div class="alert-body">
+          <div class="alert-title">{{ t.inventory_item.name if t.inventory_item else '—' }} — {{ t.plot.plot_code if t.plot else '—' }}</div>
+          <div class="alert-sub">{{ t.growth_stage.stage_code if t.growth_stage else '—' }} · due {{ t.planned_date.strftime('%b %d') if t.planned_date else '—' }} · {{ t._days_late }}d overdue · {{ total }} {{ unit }}</div>
+        </div>
+        <div class="alert-action">
+          <form method="POST" action="{{ url_for('treatment_apply', tid=t.id) }}">
+            <button class="btn btn-secondary btn-sm" type="submit">Apply</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+
+      {% for item in inventory %}
+        {% if item._status == 'critical' %}
+        <div class="alert-row">
+          <div class="alert-stripe stripe-red"></div>
+          <div class="alert-body">
+            <div class="alert-title">{{ item.name }}</div>
+            <div class="alert-sub">{{ item.quantity_on_hand | round(1) }} {{ item.unit }} on hand · reorder at {{ item.reorder_threshold }}{% if item._days %} · ~{{ item._days }}d remaining{% endif %}</div>
+          </div>
+          <div class="alert-action"><span class="badge badge-red">critical</span></div>
+        </div>
+        {% elif item._status == 'warning' %}
+        <div class="alert-row">
+          <div class="alert-stripe stripe-amber"></div>
+          <div class="alert-body">
+            <div class="alert-title">{{ item.name }}</div>
+            <div class="alert-sub">{{ item.quantity_on_hand | round(1) }} {{ item.unit }} on hand · reorder at {{ item.reorder_threshold }}{% if item._days %} · ~{{ item._days }}d remaining{% endif %}</div>
+          </div>
+          <div class="alert-action"><span class="badge badge-amber">low</span></div>
+        </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="all-clear">
+      <span class="status-dot dot-green"></span>
+      No overdue treatments · No critical or low stock
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="section">
+    <div class="section-head">
+      <div class="section-title">14-Day Consumption</div>
+      <span style="font-size:10px;color:var(--text-3);font-family:var(--mono);">all items combined</span>
+    </div>
+
+    <div class="chart-area">
+      {% for bar in chart %}
+      <div class="chart-col {% if bar.is_today %}chart-col-today{% endif %}">
+        <div class="chart-value">{% if bar.value > 0 %}{{ bar.value }}{% endif %}</div>
+        <div class="chart-bar-wrap">
+          <div class="chart-bar" style="height:{{ bar.pct }}%;"></div>
+        </div>
+        <div class="chart-label">{{ bar.weekday if loop.index % 2 == 0 or bar.is_today else '' }}</div>
+      </div>
+      {% endfor %}
+    </div>
+
+    {% if top5 %}
+    <div class="top-items">
+      {% for item in top5 %}
+      <div class="top-item-row">
+        <div class="top-item-name">{{ item.name }}</div>
+        <div class="top-item-bar-wrap">
+          <div class="top-item-bar" style="width:{{ item.pct }}%;"></div>
+        </div>
+        <div class="top-item-val">{{ item.total }} {{ item.unit }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<hr>
+
+<div class="grid-2">
+
+  <div class="section">
+    <div class="section-head">
+      <div class="section-title">Today's Activity</div>
+      <a href="{{ url_for('log_usage') }}" class="section-link">Log usage →</a>
+    </div>
+    {% if today_logs %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Item</th><th>Used</th><th>Plot</th><th>By</th></tr>
+        </thead>
+        <tbody>
+          {% for log in today_logs %}
+          <tr>
+            <td>{{ log.inventory_item.name if log.inventory_item else '—' }}</td>
+            <td class="mono">{{ log.quantity_used }} {{ log.inventory_item.unit if log.inventory_item else '' }}</td>
+            <td class="dim2">{{ log.plot.plot_code if log.plot else '—' }}</td>
+            <td class="dim">{{ log.logged_by_user.name if log.logged_by_user else '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty">nothing logged yet today</div>
+    {% endif %}
+  </div>
+
+  <div class="section">
+    <div class="section-head">
+      <div class="section-title">Due This Week</div>
+      <a href="{{ url_for('treatments') }}" class="section-link">All treatments →</a>
+    </div>
+    {% if upcoming %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Date</th><th>Plot</th><th>Input</th><th>Stage</th></tr>
+        </thead>
+        <tbody>
+          {% for t in upcoming %}
+          <tr>
+            <td class="mono dim2">{{ t.planned_date.strftime('%b %d') if t.planned_date else '—' }}</td>
+            <td>{{ t.plot.plot_code if t.plot else '—' }}</td>
+            <td class="dim">{{ t.inventory_item.name if t.inventory_item else '—' }}</td>
+            <td class="mono dim2">{{ t.growth_stage.stage_code if t.growth_stage else '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty">no treatments due this week</div>
+    {% endif %}
+  </div>
+
+</div>
+
+<script>
+  // Inject today's date in serif italic style
+  const d = new Date();
+  const opts = { month: 'long', day: 'numeric', year: 'numeric' };
+  document.getElementById('today-date').textContent = d.toLocaleDateString('en-US', opts);
+</script>
+
+{% endblock %}

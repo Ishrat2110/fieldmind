@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}Log Usage{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <div class="page-title">Log Usage</div>
+    <div class="page-sub">{% if today_logs %}{{ today_logs | length }} entr{{ 'y' if today_logs|length==1 else 'ies' }} logged today{% else %}nothing logged today yet{% endif %}</div>
+
+  </div>
+</div>
+
+<div class="grid-2" style="align-items:start;">
+
+  <!-- Form -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-title">New Entry</span>
+    </div>
+    <form method="POST" action="{{ url_for('log_usage') }}">
+      <div class="form-grid form-grid-2" style="margin-bottom:16px;">
+        <div class="field" style="grid-column:1/-1;">
+          <label>Inventory Item *</label>
+          <select name="item_id" required>
+            {% for item in inventory %}
+            <option value="{{ item.id }}">{{ item.name }} ({{ item.unit }})</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label>Quantity Used *</label>
+          <input type="number" name="qty_used" step="0.1" min="0.01" required placeholder="0.0">
+        </div>
+        <div class="field">
+          <label>Date *</label>
+          <input type="date" name="log_date" value="{{ today }}" required>
+        </div>
+        <div class="field">
+          <label>Plot</label>
+          <select name="plot_id">
+            <option value="">— None —</option>
+            {% for p in plots %}
+            <option value="{{ p.id }}">{{ p.plot_code }} — {{ p.variety.variety_code if p.variety else '?' }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label>Equipment</label>
+          <select name="equip_id">
+            <option value="">— None —</option>
+            {% for e in equipment %}
+            <option value="{{ e.id }}">{{ e.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label>Logged By *</label>
+          <select name="user_id" required>
+            {% for u in users %}
+            <option value="{{ u.id }}">{{ u.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field" style="grid-column:1/-1;">
+          <label>Notes</label>
+          <textarea name="notes" rows="3" placeholder="Optional…"></textarea>
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary">Submit Log</button>
+    </form>
+  </div>
+
+  <!-- Today's logs -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-title">Today's Logs</span>
+      <a href="{{ url_for('history') }}" class="btn btn-ghost btn-sm">Full history →</a>
+    </div>
+    {% if today_logs %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Item</th><th>Used</th><th>Plot</th><th>Equipment</th><th>Notes</th><th></th></tr>
+        </thead>
+        <tbody>
+          {% for log in today_logs %}
+          <tr>
+            <td style="font-weight:500;">{{ log.inventory_item.name if log.inventory_item else '—' }}</td>
+            <td class="mono">{{ log.quantity_used }} {{ log.inventory_item.unit if log.inventory_item else '' }}</td>
+            <td class="dim2">{{ log.plot.plot_code if log.plot else '—' }}</td>
+            <td class="dim2">{{ log.equipment.name if log.equipment else '—' }}</td>
+            <td class="dim" style="max-width:140px; overflow:hidden; text-overflow:ellipsis;">{{ log.notes or '—' }}</td>
+            <td>
+              <form method="POST" action="{{ url_for('log_delete', lid=log.id) }}" onsubmit="return confirm('Delete this log entry and restore stock?')">
+                <button class="btn btn-xs btn-danger" type="submit">Delete</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty">nothing logged yet today</div>
+    {% endif %}
+  </div>
+
+</div>
+
+{% endblock %}

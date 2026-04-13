@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}History{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <div class="page-title">Usage History</div>
+    <div class="page-sub">{% if total_count %}{{ total_count }} log{{ 's' if total_count != 1 }} · {{ total | round(1) }} total consumed (this page){% else %}no logs match filters{% endif %}</div>
+  </div>
+  <a href="{{ url_for('history_export', item=filter_item, period=period, src=filter_src) }}" class="btn btn-secondary btn-sm">
+    <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+    </svg>
+    Export CSV
+  </a>
+</div>
+
+<div class="filters">
+  <form method="GET" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+    <select name="item" onchange="this.form.submit()">
+      <option value="">All Items</option>
+      {% for item in inventory %}
+      <option value="{{ item.name }}" {% if filter_item == item.name %}selected{% endif %}>{{ item.name }}</option>
+      {% endfor %}
+    </select>
+
+    <select name="period" onchange="this.form.submit()">
+      <option value="7"   {% if period=='7'   %}selected{% endif %}>Last 7 days</option>
+      <option value="30"  {% if period=='30'  %}selected{% endif %}>Last 30 days</option>
+      <option value="90"  {% if period=='90'  %}selected{% endif %}>Last 90 days</option>
+      <option value="all" {% if period=='all' %}selected{% endif %}>All time</option>
+    </select>
+
+    <select name="src" onchange="this.form.submit()">
+      <option value="all"    {% if filter_src=='all'    %}selected{% endif %}>All sources</option>
+      <option value="manual" {% if filter_src=='manual' %}selected{% endif %}>Manual only</option>
+      <option value="ai"     {% if filter_src=='ai'     %}selected{% endif %}>AI estimated</option>
+    </select>
+
+    {% if filter_item or period != '30' or filter_src != 'all' %}
+    <a href="{{ url_for('history') }}" class="btn btn-ghost btn-sm">Clear</a>
+    {% endif %}
+  </form>
+</div>
+
+<div class="table-wrap">
+  {% if logs %}
+  <table>
+    <thead>
+      <tr>
+        <th>Date</th><th>Item</th><th>Qty</th><th>Unit</th>
+        <th>Plot</th><th>Equipment</th><th>Logged By</th><th>Source</th><th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for log in logs %}
+      <tr>
+        <td class="mono dim2" style="white-space:nowrap;">{{ log.log_date.strftime('%b %d, %Y') if log.log_date else '—' }}</td>
+        <td style="font-weight:500;">{{ log.inventory_item.name if log.inventory_item else '—' }}</td>
+        <td class="mono">{{ log.quantity_used }}</td>
+        <td class="dim2">{{ log.inventory_item.unit if log.inventory_item else '—' }}</td>
+        <td class="dim2">{{ log.plot.plot_code if log.plot else '—' }}</td>
+        <td class="dim2">{{ log.equipment.name if log.equipment else '—' }}</td>
+        <td class="dim">{{ log.logged_by_user.name if log.logged_by_user else '—' }}</td>
+        <td>
+          {% if log.ai_estimated %}
+          <span class="badge badge-blue">ai</span>
+          {% else %}
+          <span class="dim2" style="font-size:11px; font-family:var(--mono);">manual</span>
+          {% endif %}
+        </td>
+        <td class="dim" style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ log.notes or '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty">no logs match the current filters</div>
+  {% endif %}
+</div>
+
+{% if pages > 1 %}
+<div class="pagination">
+  {% if current_page > 1 %}
+  <a href="{{ url_for('history', item=filter_item, period=period, src=filter_src, page=current_page-1) }}" class="btn btn-ghost btn-sm">← Prev</a>
+  {% endif %}
+  <span class="dim2" style="font-size:12px; font-family:var(--mono);">page {{ current_page }} / {{ pages }}</span>
+  {% if current_page < pages %}
+  <a href="{{ url_for('history', item=filter_item, period=period, src=filter_src, page=current_page+1) }}" class="btn btn-ghost btn-sm">Next →</a>
+  {% endif %}
+</div>
+{% endif %}
+
+{% endblock %}

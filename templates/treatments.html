@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block title %}Treatments{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <div class="page-title">Treatments</div>
+    <div class="page-sub">{{ overdue | length }} overdue · {{ upcoming | length }} due in 14 days</div>
+  </div>
+</div>
+
+<!-- Overdue -->
+{% if overdue %}
+<div class="section">
+  <div class="section-header">
+    <span class="section-title">Overdue</span>
+    {% if overdue | length > 1 %}
+    <form method="POST" action="{{ url_for('treatment_apply_bulk') }}" style="display:inline;">
+      {% for t in overdue %}<input type="hidden" name="ids[]" value="{{ t.id }}">{% endfor %}
+      <button type="submit" class="btn btn-secondary btn-sm">Mark all {{ overdue | length }} applied</button>
+    </form>
+    {% endif %}
+  </div>
+  <div class="alert-list">
+    {% for t in overdue %}
+    {% set unit  = t.inventory_item.unit if t.inventory_item else '' %}
+    <div class="alert-row">
+      <span class="alert-dot dot-red"></span>
+      <div class="alert-body">
+        <div class="alert-title">{{ t.inventory_item.name if t.inventory_item else '—' }} — {{ t.plot.plot_code if t.plot else '—' }} ({{ t.growth_stage.stage_code if t.growth_stage else '—' }})</div>
+        <div class="alert-sub">due {{ t.planned_date.strftime('%b %d, %Y') if t.planned_date else '—' }} · {{ t._days_late }}d overdue · {{ t.rate_per_ha }} {{ unit }}/ha · total {{ t._total }} {{ unit }}</div>
+      </div>
+      <div class="alert-actions">
+        <form method="POST" action="{{ url_for('treatment_apply', tid=t.id) }}">
+          <button class="btn btn-secondary btn-sm" type="submit">Mark Applied</button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+<hr>
+{% endif %}
+
+<!-- Upcoming -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-title">Upcoming — Next 14 Days</span>
+    <span class="section-count">{{ upcoming | length }} scheduled</span>
+  </div>
+  {% if upcoming %}
+  <div class="alert-list">
+    {% for t in upcoming %}
+    {% set unit = t.inventory_item.unit if t.inventory_item else '' %}
+    <div class="alert-row">
+      <span class="alert-dot {% if t._days_until <= 2 %}dot-amber{% else %}dot-blue{% endif %}"></span>
+      <div class="alert-body">
+        <div class="alert-title">{{ t.inventory_item.name if t.inventory_item else '—' }} — {{ t.plot.plot_code if t.plot else '—' }} ({{ t.growth_stage.stage_code if t.growth_stage else '—' }})</div>
+        <div class="alert-sub">
+          {{ t.planned_date.strftime('%b %d, %Y') if t.planned_date else '—' }} · in {{ t._days_until }}d · {{ t.rate_per_ha }} {{ unit }}/ha · total {{ t._total }} {{ unit }}
+          {% if not t._stock_ok %} · <span style="color:var(--red);">insufficient stock</span>{% endif %}
+        </div>
+      </div>
+      <div class="alert-actions">
+        <form method="POST" action="{{ url_for('treatment_apply', tid=t.id) }}">
+          <button class="btn btn-secondary btn-sm" type="submit">Mark Applied</button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty">no treatments due in the next 14 days</div>
+  {% endif %}
+</div>
+
+<hr>
+
+<!-- By plot -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-title">By Plot</span>
+  </div>
+
+  <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap;">
+    <form method="GET" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+      <select name="plot_id" onchange="this.form.submit()">
+        {% for p in plots %}
+        <option value="{{ p.id }}" {% if selected_plot and p.id == selected_plot.id %}selected{% endif %}>
+          {{ p.plot_code }} — {{ p.variety.variety_code if p.variety else '?' }}
+        </option>
+        {% endfor %}
+      </select>
+      <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-2); cursor:pointer; text-transform:none; letter-spacing:0; font-weight:400;">
+        <input type="checkbox" name="applied" value="1" {% if show_applied %}checked{% endif %} onchange="this.form.submit()">
+        Show applied
+      </label>
+    </form>
+  </div>
+
+  {% if selected_plot %}
+    {% if plot_treatments %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Stage</th><th>Input</th><th>Rate /ha</th><th>Total</th>
+            <th>Unit</th><th>Planned</th><th>Type</th><th>Status</th><th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in plot_treatments %}
+          <tr>
+            <td class="mono">{{ t.growth_stage.stage_code if t.growth_stage else '—' }}</td>
+            <td style="font-weight:500;">{{ t.inventory_item.name if t.inventory_item else '—' }}</td>
+            <td class="mono dim">{{ t.rate_per_ha }}</td>
+            <td class="mono">{{ t._total }}</td>
+            <td class="dim2">{{ t.inventory_item.unit if t.inventory_item else '—' }}</td>
+            <td class="mono dim2">{{ t.planned_date.strftime('%b %d, %Y') if t.planned_date else '—' }}</td>
+            <td class="dim2">{{ t.treatment_type.value | capitalize }}</td>
+            <td>
+              {% if t.applied %}
+              <span class="badge badge-green">applied</span>
+              {% else %}
+              <span class="badge badge-gray">pending</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if not t.applied %}
+              <form method="POST" action="{{ url_for('treatment_apply', tid=t.id) }}">
+                <button class="btn btn-xs btn-secondary" type="submit">Apply</button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% set pending = plot_treatments | rejectattr('applied') | list %}
+    {% if pending | length > 1 %}
+    <div style="margin-top:14px;">
+      <form method="POST" action="{{ url_for('treatment_apply_bulk') }}">
+        {% for t in pending %}<input type="hidden" name="ids[]" value="{{ t.id }}">{% endfor %}
+        <button type="submit" class="btn btn-secondary btn-sm">Mark all {{ pending | length }} pending as applied</button>
+      </form>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="empty">no {% if not show_applied %}pending {% endif %}treatments for this plot</div>
+    {% endif %}
+  {% endif %}
+</div>
+
+{% endblock %}
