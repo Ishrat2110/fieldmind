@@ -10,5 +10,3 @@ geopandas>=0.14,<1.0
 folium>=0.16,<1.0
 streamlit-folium>=0.18,<1.0
 pyogrio>=0.7
-fastapi>=0.110,<1.0
-uvicorn>=0.29,<1.0
