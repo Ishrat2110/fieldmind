@@ -135,6 +135,47 @@
 
 </div>
 
+{% if suggestions %}
+<div class="section" style="margin-bottom:36px;">
+  <div class="section-head">
+    <div class="section-title">AI Reorder Suggestions</div>
+    <a href="{{ url_for('suggestions') }}" class="section-link">View all {{ suggestions | length }} →</a>
+  </div>
+  <div style="border:1px solid var(--border); border-radius:8px; overflow:hidden; background:var(--surface);">
+    {% for sug in suggestions[:3] %}
+    {% set urgency = sug._urgency | default('medium') %}
+    <div style="display:flex; align-items:center; gap:14px; padding:14px 18px; border-bottom: {% if not loop.last %}1px solid var(--border){% else %}none{% endif %};">
+      <div style="width:4px; align-self:stretch; border-radius:2px; flex-shrink:0; min-height:24px;
+        background:{% if urgency=='critical' %}var(--red){% elif urgency=='high' %}var(--amber){% elif urgency=='medium' %}var(--gold){% else %}var(--green){% endif %};"></div>
+      <div style="flex:1; min-width:0;">
+        <div style="font-size:13.5px; font-weight:500; color:var(--text);">
+          {{ sug.inventory_item.name if sug.inventory_item else '—' }}
+          <span style="font-weight:400; color:var(--text-3); margin-left:6px; font-family:var(--mono); font-size:11px;">
+            → order {{ sug.draft_order_qty | round(0) | int }} {{ sug.inventory_item.unit if sug.inventory_item else '' }}
+          </span>
+        </div>
+        <div style="font-size:11px; color:var(--text-3); font-family:var(--mono); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+          {{ sug.ai_message.split('<!--json')[0].strip()[:120] if '<!--json' in sug.ai_message else sug.ai_message[:120] }}{% if sug.ai_message | length > 120 %}…{% endif %}
+        </div>
+      </div>
+      {% if current_user_role in ('admin', 'manager') %}
+      <div style="display:flex; gap:6px; flex-shrink:0;">
+        <form method="POST" action="{{ url_for('suggestion_approve', nid=sug.id) }}" style="margin:0;">
+          <button type="submit" class="btn btn-primary btn-xs">Approve</button>
+        </form>
+        <form method="POST" action="{{ url_for('suggestion_dismiss', nid=sug.id) }}" style="margin:0;">
+          <button type="submit" class="btn btn-ghost btn-xs">Dismiss</button>
+        </form>
+      </div>
+      {% else %}
+      <span class="badge {% if urgency=='critical' %}badge-red{% elif urgency=='high' %}badge-amber{% elif urgency=='medium' %}badge-gold{% else %}badge-green{% endif %}">{{ urgency }}</span>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
 <hr>
 
 <div class="grid-2">

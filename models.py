@@ -267,7 +267,7 @@ class InventoryItem(Base):
 
     farm       = relationship("Farm",     back_populates="inventory")
     usage_logs = relationship("UsageLog", back_populates="inventory_item",
-                              cascade="all, delete-orphan")
+                              passive_deletes=True)
 
     def __repr__(self):
         return f"<InventoryItem '{self.name}' — {self.quantity_on_hand} {self.unit}>"
@@ -309,7 +309,7 @@ class UsageLog(Base):
     __tablename__ = "usage_logs"
 
     id                    = Column(Integer, primary_key=True)
-    inventory_item_id     = Column(Integer, ForeignKey("inventory_items.id", ondelete="CASCADE"),  nullable=False)
+    inventory_item_id     = Column(Integer, ForeignKey("inventory_items.id", ondelete="RESTRICT"), nullable=False)
     plot_id               = Column(Integer, ForeignKey("plots.id",           ondelete="SET NULL"))
     equipment_id          = Column(Integer, ForeignKey("equipment.id",       ondelete="SET NULL"))
     logged_by             = Column(Integer, ForeignKey("users.id",           ondelete="RESTRICT"), nullable=False)

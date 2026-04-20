@@ -16,11 +16,18 @@ from sqlalchemy.orm import joinedload
 from werkzeug.security import check_password_hash
 from database import get_session
 from models import (Farm, InventoryItem, UsageLog, Plot, Equipment,
-                    User, TreatmentPlan)
+                    User, TreatmentPlan, Notification, NotificationStatus)
 from datetime import datetime, date, timedelta, timezone
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "change-me-in-production")
+_secret = os.environ.get("SECRET_KEY")
+if not _secret:
+    raise RuntimeError(
+        "SECRET_KEY is not set. Generate one with "
+        "`python -c \"import secrets; print(secrets.token_hex(32))\"` "
+        "and put it in your .env file."
+    )
+app.secret_key = _secret
 
 _PUBLIC_ENDPOINTS = {"login", "static"}
 
@@ -96,8 +103,13 @@ def nav_context(s):
     critical_count = sum(1 for i in inv if stock_status(i) == "critical")
     warning_count  = sum(1 for i in inv if stock_status(i) == "warning")
     users = s.query(User).filter_by(is_active=True).order_by(User.name).all()
+    suggestion_count = (
+        s.query(Notification).filter_by(status=NotificationStatus.pending).count()
+        if farm else 0
+    )
     return dict(farm=farm, overdue_count=overdue_count,
                 critical_count=critical_count, warning_count=warning_count,
+                suggestion_count=suggestion_count,
                 current_user_name=flask_session.get("user_name", ""),
                 current_user_nuid=flask_session.get("user_nuid", ""),
                 current_user_role=flask_session.get("user_role", ""),
@@ -302,12 +314,20 @@ def dashboard():
     chart  = daily_chart_data(s)
     top5   = top_items_chart(s)
 
+    # Generate AI reorder suggestions for critical/warning items
+    from reorder_ai import maybe_generate_suggestion, get_active_suggestions, _extract_urgency
+    for item in inv:
+        if item._status in ("critical", "warning"):
+            maybe_generate_suggestion(item, s)
+    suggestions = get_active_suggestions(s, farm.id) if farm else []
+
     return render_template("dashboard.html",
         page="dashboard",
         overdue=overdue, upcoming=upcoming,
         today_logs=today_logs, inventory=inv,
         plots_count=plots_count,
         chart=chart, top5=top5,
+        suggestions=suggestions,
         **ctx)
 
 
@@ -320,11 +340,23 @@ def inventory():
         s.query(InventoryItem).filter_by(farm_id=farm.id).all() if farm else [], s
     )
     inv.sort(key=lambda i: ({"critical": 0, "warning": 1, "ok": 2}[i._status], i._days or 9999))
+
+    # Attach pending suggestion info to each item
+    from reorder_ai import get_active_suggestions
+    active_sugs = {n.inventory_item_id: n for n in get_active_suggestions(s, farm.id)} if farm else {}
+    for item in inv:
+        sug = active_sugs.get(item.id)
+        item._has_suggestion = sug is not None
+        item._suggested_qty  = int(sug.draft_order_qty) if sug and sug.draft_order_qty else None
+
     return render_template("inventory.html", page="inventory", inventory=inv, **ctx)
 
 
 @app.route("/inventory/add", methods=["POST"])
 def inventory_add():
+    guard = _require_manager_or_admin()
+    if guard:
+        return guard
     s    = db()
     farm = get_farm(s)
     name     = request.form.get("name", "").strip()
@@ -364,6 +396,9 @@ def inventory_add():
 
 @app.route("/inventory/<int:iid>/edit", methods=["POST"])
 def inventory_edit(iid):
+    guard = _require_manager_or_admin()
+    if guard:
+        return guard
     s    = db()
     item = s.query(InventoryItem).get(iid)
     if not item:
@@ -406,13 +441,26 @@ def inventory_edit(iid):
 
 @app.route("/inventory/<int:iid>/delete", methods=["POST"])
 def inventory_delete(iid):
+    guard = _require_manager_or_admin()
+    if guard:
+        return guard
     s    = db()
     item = s.query(InventoryItem).get(iid)
-    if item:
-        name = item.name
-        s.delete(item)
-        s.commit()
-        flash(f"'{name}' deleted.", "success")
+    if not item:
+        return redirect(url_for("inventory"))
+
+    log_count = s.query(UsageLog).filter_by(inventory_item_id=iid).count()
+    if log_count > 0:
+        flash(
+            f"Cannot delete '{item.name}': {log_count} usage log entries reference it. "
+            "Delete those logs first, or keep the item for historical accuracy.",
+            "error"
+        )
+        return redirect(url_for("inventory"))
+
+    s.delete(item)
+    s.commit()
+    flash(f"Deleted {item.name}.", "success")
     return redirect(url_for("inventory"))
 
 
@@ -477,6 +525,9 @@ def treatments():
 
 @app.route("/treatments/<int:tid>/apply", methods=["POST"])
 def treatment_apply(tid):
+    guard = _require_manager_or_admin()
+    if guard:
+        return guard
     s = db()
     t = s.query(TreatmentPlan).get(tid)
     if t:
@@ -489,6 +540,9 @@ def treatment_apply(tid):
 
 @app.route("/treatments/apply-bulk", methods=["POST"])
 def treatment_apply_bulk():
+    guard = _require_manager_or_admin()
+    if guard:
+        return guard
     s     = db()
     ids   = request.form.getlist("ids[]", type=int)
     count = 0
@@ -522,6 +576,9 @@ def log_usage():
                   .order_by(UsageLog.log_date.desc()).all())
 
     if request.method == "POST":
+        guard = _require_manager_or_admin()
+        if guard:
+            return guard
         try:
             item_id  = int(request.form["item_id"])
             qty_used = float(request.form["qty_used"])
@@ -548,7 +605,16 @@ def log_usage():
             flash("Inventory item not found.", "error")
             return redirect(url_for("log_usage"))
 
-        item.quantity_on_hand = max(0, item.quantity_on_hand - qty_used)
+        if qty_used > (item.quantity_on_hand or 0):
+            flash(
+                f"Cannot log {qty_used} {item.unit}: only "
+                f"{item.quantity_on_hand:.1f} {item.unit} on hand. "
+                "Restock the item first, or correct the quantity.",
+                "error"
+            )
+            return redirect(url_for("log_usage"))
+
+        item.quantity_on_hand = (item.quantity_on_hand or 0) - qty_used
 
         log = UsageLog(
             inventory_item_id=item_id,
@@ -564,6 +630,8 @@ def log_usage():
         flash(f"Logged {qty_used} {item.unit} of {item.name}. Stock: {item.quantity_on_hand:.1f} {item.unit}", "success")
         if item.reorder_threshold and item.quantity_on_hand <= item.reorder_threshold:
             flash(f"{item.name} is now below reorder threshold.", "warning")
+            from reorder_ai import maybe_generate_suggestion
+            maybe_generate_suggestion(item, s)
         return redirect(url_for("log_usage"))
 
     return render_template("log.html",
@@ -575,16 +643,22 @@ def log_usage():
 
 @app.route("/log/<int:lid>/delete", methods=["POST"])
 def log_delete(lid):
+    guard = _require_manager_or_admin()
+    if guard:
+        return guard
     s   = db()
     log = s.query(UsageLog).get(lid)
     if log:
-        # restore stock
-        item = log.inventory_item
-        if item:
-            item.quantity_on_hand += log.quantity_used
+        item_name = log.inventory_item.name if log.inventory_item else "item"
+        qty       = log.quantity_used
+        unit      = log.inventory_item.unit if log.inventory_item else ""
         s.delete(log)
         s.commit()
-        flash("Log entry deleted and stock restored.", "success")
+        flash(
+            f"Log entry removed ({qty} {unit} of {item_name}). "
+            "Current stock was not changed — adjust manually if needed.",
+            "success"
+        )
     return redirect(request.referrer or url_for("log_usage"))
 
 
@@ -711,5 +785,121 @@ def users():
     return render_template("users.html", page="users", users=all_users, **ctx)
 
 
+# ── suggestion routes ──────────────────────────────────────────────────────────
+
+# Simple in-memory rate limit: {user_id: last_refresh_ts}
+_refresh_rate_limit: dict = {}
+_REFRESH_COOLDOWN_SECS = 300  # 5 minutes
+
+
+def _require_manager_or_admin():
+    """Return a redirect/403 response if the current user lacks the required role.
+    Returns None if the user has sufficient privileges."""
+    role = flask_session.get("user_role", "")
+    if role not in ("admin", "manager"):
+        flash("You do not have permission to perform this action.", "error")
+        return redirect(request.referrer or url_for("dashboard"))
+    return None
+
+
+@app.route("/suggestions")
+def suggestions():
+    s   = db()
+    ctx = nav_context(s)
+    farm = ctx["farm"]
+    from reorder_ai import get_active_suggestions
+    active = get_active_suggestions(s, farm.id) if farm else []
+    resolved = (
+        s.query(Notification)
+        .filter(
+            Notification.status != NotificationStatus.pending,
+            Notification.resolved_at >= datetime.now(timezone.utc) - timedelta(days=7),
+        )
+        .order_by(Notification.resolved_at.desc())
+        .limit(20)
+        .all()
+    ) if farm else []
+    return render_template("suggestions.html",
+                           page="suggestions",
+                           active=active, resolved=resolved, **ctx)
+
+
+@app.route("/suggestions/<int:nid>/approve", methods=["POST"])
+def suggestion_approve(nid):
+    guard = _require_manager_or_admin()
+    if guard:
+        return guard
+    s = db()
+    from reorder_ai import resolve_suggestion
+    resolve_suggestion(nid, "approve", s)
+    flash("Reorder suggestion approved.", "success")
+    return redirect(request.referrer or url_for("suggestions"))
+
+
+@app.route("/suggestions/<int:nid>/dismiss", methods=["POST"])
+def suggestion_dismiss(nid):
+    guard = _require_manager_or_admin()
+    if guard:
+        return guard
+    s = db()
+    from reorder_ai import resolve_suggestion
+    resolve_suggestion(nid, "dismiss", s)
+    flash("Suggestion dismissed.", "success")
+    return redirect(request.referrer or url_for("suggestions"))
+
+
+@app.route("/suggestions/refresh", methods=["POST"])
+def suggestions_refresh():
+    guard = _require_manager_or_admin()
+    if guard:
+        return guard
+
+    user_id = flask_session.get("user_id")
+    now_ts = datetime.now(timezone.utc).timestamp()
+    last = _refresh_rate_limit.get(user_id, 0)
+    if now_ts - last < _REFRESH_COOLDOWN_SECS:
+        remaining = int(_REFRESH_COOLDOWN_SECS - (now_ts - last))
+        flash(f"Please wait {remaining}s before refreshing again.", "warning")
+        return redirect(url_for("suggestions"))
+
+    _refresh_rate_limit[user_id] = now_ts
+
+    s   = db()
+    ctx = nav_context(s)
+    farm = ctx["farm"]
+    if not farm:
+        return redirect(url_for("suggestions"))
+
+    # Invalidate suggestions older than 1h (mark dismissed)
+    stale_cutoff = datetime.now(timezone.utc) - timedelta(hours=1)
+    stale = (
+        s.query(Notification)
+        .filter(
+            Notification.farm_id == farm.id,
+            Notification.status == NotificationStatus.pending,
+            Notification.created_at <= stale_cutoff,
+        )
+        .all()
+    )
+    for n in stale:
+        n.status = NotificationStatus.dismissed
+        n.resolved_at = datetime.now(timezone.utc)
+    s.commit()
+
+    # Re-generate for all low-stock items
+    from reorder_ai import maybe_generate_suggestion
+    inv = s.query(InventoryItem).filter_by(farm_id=farm.id).all()
+    count = 0
+    for item in inv:
+        if stock_status(item) in ("critical", "warning"):
+            sug = maybe_generate_suggestion(item, s)
+            if sug:
+                count += 1
+
+    flash(f"Refreshed — {count} suggestion{'s' if count != 1 else ''} generated.", "success")
+    return redirect(url_for("suggestions"))
+
+
 if __name__ == "__main__":
-    app.run(debug=True, port=5001)
+    debug = os.environ.get("FLASK_DEBUG", "false").lower() in ("true", "1", "yes")
+    app.run(debug=debug, port=5001)

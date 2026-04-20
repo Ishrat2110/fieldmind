@@ -103,8 +103,14 @@
             <span class="badge {% if item._status=='critical' %}badge-red{% elif item._status=='warning' %}badge-amber{% else %}badge-green{% endif %}">
               {{ item._status }}
             </span>
+            {% if item._has_suggestion %}
+            <span class="badge badge-gold" style="margin-left:4px;" title="AI suggests reordering {{ item._suggested_qty }} {{ item.unit }}">
+              AI ↑{{ item._suggested_qty }}
+            </span>
+            {% endif %}
           </td>
           <td style="white-space:nowrap;">
+            {% if current_user_role in ('admin', 'manager') %}
             <button class="btn btn-xs btn-ghost"
               onclick="openEditModal(this)"
               data-id="{{ item.id }}"
@@ -116,9 +122,10 @@
               data-reorder="{{ item.reorder_quantity or 0 }}"
               data-supplier="{{ item.supplier or '' }}"
               data-cost="{{ item.unit_cost or '' }}">Edit</button>
-            <form method="POST" action="{{ url_for('inventory_delete', iid=item.id) }}" style="display:inline;" onsubmit="return confirm('Delete {{ item.name }}? This will also delete all usage logs for this item.')">
+            <form method="POST" action="{{ url_for('inventory_delete', iid=item.id) }}" style="display:inline;" onsubmit="return confirm('Delete {{ item.name }}? Only allowed if no usage logs reference it.')">
               <button class="btn btn-xs btn-danger" type="submit">Delete</button>
             </form>
+            {% endif %}
           </td>
         </tr>
         {% endfor %}
@@ -128,6 +135,7 @@
 </div>
 
 <!-- Add item -->
+{% if current_user_role in ('admin', 'manager') %}
 <div class="section">
   <div class="section-header">
     <span class="section-title">Add Item</span>
@@ -173,6 +181,7 @@
     <button type="submit" class="btn btn-primary">Add Item</button>
   </form>
 </div>
+{% endif %}
 
 <!-- Edit modal -->
 <div id="edit-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:200; align-items:center; justify-content:center;">

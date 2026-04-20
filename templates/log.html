@@ -18,6 +18,7 @@
     <div class="section-header">
       <span class="section-title">New Entry</span>
     </div>
+    {% if current_user_role in ('admin', 'manager') %}
     <form method="POST" action="{{ url_for('log_usage') }}">
       <div class="form-grid form-grid-2" style="margin-bottom:16px;">
         <div class="field" style="grid-column:1/-1;">
@@ -69,6 +70,9 @@
       </div>
       <button type="submit" class="btn btn-primary">Submit Log</button>
     </form>
+    {% else %}
+    <p class="dim">View only — contact an admin or manager to log usage.</p>
+    {% endif %}
   </div>
 
   <!-- Today's logs -->
@@ -92,9 +96,13 @@
             <td class="dim2">{{ log.equipment.name if log.equipment else '—' }}</td>
             <td class="dim" style="max-width:140px; overflow:hidden; text-overflow:ellipsis;">{{ log.notes or '—' }}</td>
             <td>
+              {% if current_user_role in ('admin', 'manager') %}
               <form method="POST" action="{{ url_for('log_delete', lid=log.id) }}" onsubmit="return confirm('Delete this log entry and restore stock?')">
                 <button class="btn btn-xs btn-danger" type="submit">Delete</button>
               </form>
+              {% else %}
+              <span class="muted">—</span>
+              {% endif %}
             </td>
           </tr>
           {% endfor %}

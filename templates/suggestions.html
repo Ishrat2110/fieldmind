@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+{% block title %}AI Suggestions{% endblock %}
+
+{% block content %}
+
+<style>
+.sug-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  margin-bottom: 14px;
+  overflow: hidden;
+}
+.sug-card-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.sug-urgency-bar {
+  width: 4px;
+  align-self: stretch;
+  border-radius: 2px;
+  flex-shrink: 0;
+  min-height: 20px;
+}
+.urgency-critical .sug-urgency-bar { background: var(--red); }
+.urgency-high     .sug-urgency-bar { background: var(--amber); }
+.urgency-medium   .sug-urgency-bar { background: var(--gold); }
+.urgency-low      .sug-urgency-bar { background: var(--green); }
+
+.sug-item-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.sug-meta {
+  font-size: 10px;
+  font-family: var(--mono);
+  color: var(--text-3);
+  margin-top: 2px;
+}
+.sug-body {
+  padding: 14px 20px 16px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.sug-rationale {
+  flex: 1;
+  font-size: 12.5px;
+  color: var(--text-2);
+  line-height: 1.55;
+  min-width: 200px;
+}
+.sug-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+  align-items: center;
+}
+.resolved-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  margin-bottom: 8px;
+}
+.resolved-item { font-size: 13px; font-weight: 500; }
+.resolved-meta { font-size: 10px; color: var(--text-3); font-family: var(--mono); margin-top: 1px; }
+.empty-suggestions {
+  padding: 56px 0;
+  text-align: center;
+  color: var(--text-3);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+</style>
+
+<div class="page-header">
+  <div>
+    <div class="page-title">AI Reorder Suggestions</div>
+    <div class="page-sub">Gemini-powered recommendations for low-stock items</div>
+  </div>
+  {% if current_user_role in ('admin', 'manager') %}
+  <form method="POST" action="{{ url_for('suggestions_refresh') }}" style="margin:0;">
+    <button type="submit" class="btn btn-secondary btn-sm">
+      <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+      </svg>
+      Refresh Suggestions
+    </button>
+  </form>
+  {% endif %}
+</div>
+
+<!-- Pending suggestions -->
+<div class="section">
+  <div class="section-head">
+    <div class="section-title">Pending Review</div>
+    <span style="font-size:10px;color:var(--text-3);font-family:var(--mono);">{{ active | length }} suggestion{{ 's' if active | length != 1 }}</span>
+  </div>
+
+  {% if active %}
+    {% for sug in active %}
+    {% set urgency = sug._urgency | default('medium') %}
+    <div class="sug-card urgency-{{ urgency }}">
+      <div class="sug-card-header">
+        <div class="sug-urgency-bar"></div>
+        <div style="flex:1;">
+          <div class="sug-item-name">
+            {{ sug.inventory_item.name if sug.inventory_item else '—' }}
+          </div>
+          <div class="sug-meta">
+            {{ sug.inventory_item.category | capitalize if sug.inventory_item and sug.inventory_item.category else '' }}
+            · {{ sug.current_stock | round(1) }} {{ sug.inventory_item.unit if sug.inventory_item else '' }} on hand
+            {% if sug.days_until_stockout %} · ~{{ sug.days_until_stockout }}d until stockout{% endif %}
+            {% if sug.predicted_stockout %} · predicted {{ sug.predicted_stockout.strftime('%b %d') }}{% endif %}
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          {% if sug.draft_order_qty %}
+          <span class="chip">
+            Order {{ sug.draft_order_qty | round(0) | int }} {{ sug.inventory_item.unit if sug.inventory_item else '' }}
+          </span>
+          {% endif %}
+          <span class="badge {% if urgency=='critical' %}badge-red{% elif urgency=='high' %}badge-amber{% elif urgency=='medium' %}badge-gold{% else %}badge-green{% endif %}">
+            {{ urgency }}
+          </span>
+        </div>
+      </div>
+      <div class="sug-body">
+        <div class="sug-rationale">
+          {{ sug.ai_message.split('<!--json')[0].strip() if '<!--json' in sug.ai_message else sug.ai_message }}
+        </div>
+        {% if current_user_role in ('admin', 'manager') %}
+        <div class="sug-actions">
+          <form method="POST" action="{{ url_for('suggestion_approve', nid=sug.id) }}" style="margin:0;">
+            <button type="submit" class="btn btn-primary btn-sm">Approve</button>
+          </form>
+          <form method="POST" action="{{ url_for('suggestion_dismiss', nid=sug.id) }}" style="margin:0;">
+            <button type="submit" class="btn btn-ghost btn-sm">Dismiss</button>
+          </form>
+        </div>
+        {% else %}
+        <span style="font-size:10px;color:var(--text-3);font-family:var(--mono);">view only</span>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+  <div class="empty-suggestions">
+    <div style="font-size:22px;margin-bottom:10px;">✓</div>
+    No pending suggestions — everything is well stocked.
+  </div>
+  {% endif %}
+</div>
+
+<!-- Recently resolved -->
+{% if resolved %}
+<div class="section">
+  <div class="section-head">
+    <div class="section-title">Recently Resolved</div>
+    <span style="font-size:10px;color:var(--text-3);font-family:var(--mono);">last 7 days</span>
+  </div>
+  {% for r in resolved %}
+  <div class="resolved-card">
+    <div style="flex:1;">
+      <div class="resolved-item">{{ r.inventory_item.name if r.inventory_item else '—' }}</div>
+      <div class="resolved-meta">
+        {{ r.draft_order_qty | round(0) | int if r.draft_order_qty else '—' }}
+        {{ r.inventory_item.unit if r.inventory_item else '' }} ·
+        {{ r.resolved_at.strftime('%b %d, %H:%M') if r.resolved_at else '—' }}
+      </div>
+    </div>
+    <span class="badge {% if r.status.value == 'approved' %}badge-green{% else %}badge-gray{% endif %}">
+      {{ r.status.value }}
+    </span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% endblock %}

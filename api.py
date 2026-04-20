@@ -7,7 +7,6 @@ Run with: python3 api.py  (starts on http://localhost:8000)
 import os
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Optional, TypedDict
 
 import uvicorn
@@ -24,8 +23,12 @@ from models import (
 from werkzeug.security import check_password_hash
 
 # ── DB ────────────────────────────────────────────────────────────────────────
-_DEFAULT_DB = Path(__file__).parent.parent.parent / "results" / "farm_manager.db"
-DATABASE_URL = os.environ.get("DATABASE_URL", f"sqlite:///{_DEFAULT_DB}")
+DATABASE_URL = os.environ.get("DATABASE_URL")
+if not DATABASE_URL:
+    raise RuntimeError(
+        "DATABASE_URL is not set. Add it to .env — must match the value "
+        "used by server.py / database.py so both services share one file."
+    )
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(bind=engine)
 
@@ -45,12 +48,20 @@ sessions: dict[str, SessionUser] = {}
 # ── APP ───────────────────────────────────────────────────────────────────────
 app = FastAPI(title="FarmOS API")
 
+_origins_env = os.environ.get("API_CORS_ORIGINS", "")
+_allowed_origins = [o.strip() for o in _origins_env.split(",") if o.strip()]
+if not _allowed_origins:
+    raise RuntimeError(
+        "API_CORS_ORIGINS is empty. Set it in .env to a comma-separated "
+        "list of allowed origins, e.g. http://127.0.0.1:5001"
+    )
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_allowed_origins,
     allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 
@@ -247,4 +258,7 @@ def submit_log(
 
 
 if __name__ == "__main__":
-    uvicorn.run("api:app", host="0.0.0.0", port=8000, reload=True)
+    host = os.environ.get("API_HOST", "127.0.0.1")
+    port = int(os.environ.get("API_PORT", "8000"))
+    reload_flag = os.environ.get("API_RELOAD", "false").lower() in ("true", "1", "yes")
+    uvicorn.run("api:app", host=host, port=port, reload=reload_flag)

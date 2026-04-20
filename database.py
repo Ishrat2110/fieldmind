@@ -9,6 +9,10 @@ Usage:
     python database.py
 """
 
+from dotenv import load_dotenv
+load_dotenv()
+
+import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime, timedelta, timezone
@@ -23,7 +27,13 @@ from models import (
 import sys
 from werkzeug.security import generate_password_hash
 
-DATABASE_URL = "sqlite:////Users/ishratjandu/AI_Pitla/results/farm_manager.db"
+DATABASE_URL = os.environ.get("DATABASE_URL")
+if not DATABASE_URL:
+    raise RuntimeError(
+        "DATABASE_URL is not set. Add it to your .env file, e.g.\n"
+        "  DATABASE_URL=sqlite:////Users/ishratjandu/AI_Pitla/"
+        "Semester_project/farm_manager_step1/farm_manager.db"
+    )
 
 engine = create_engine(DATABASE_URL, echo=False)
 Session = sessionmaker(bind=engine)

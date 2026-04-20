@@ -15,7 +15,7 @@
 <div class="section">
   <div class="section-header">
     <span class="section-title">Overdue</span>
-    {% if overdue | length > 1 %}
+    {% if overdue | length > 1 and current_user_role in ('admin', 'manager') %}
     <form method="POST" action="{{ url_for('treatment_apply_bulk') }}" style="display:inline;">
       {% for t in overdue %}<input type="hidden" name="ids[]" value="{{ t.id }}">{% endfor %}
       <button type="submit" class="btn btn-secondary btn-sm">Mark all {{ overdue | length }} applied</button>
@@ -32,9 +32,11 @@
         <div class="alert-sub">due {{ t.planned_date.strftime('%b %d, %Y') if t.planned_date else '—' }} · {{ t._days_late }}d overdue · {{ t.rate_per_ha }} {{ unit }}/ha · total {{ t._total }} {{ unit }}</div>
       </div>
       <div class="alert-actions">
+        {% if current_user_role in ('admin', 'manager') %}
         <form method="POST" action="{{ url_for('treatment_apply', tid=t.id) }}">
           <button class="btn btn-secondary btn-sm" type="submit">Mark Applied</button>
         </form>
+        {% endif %}
       </div>
     </div>
     {% endfor %}
@@ -63,9 +65,11 @@
         </div>
       </div>
       <div class="alert-actions">
+        {% if current_user_role in ('admin', 'manager') %}
         <form method="POST" action="{{ url_for('treatment_apply', tid=t.id) }}">
           <button class="btn btn-secondary btn-sm" type="submit">Mark Applied</button>
         </form>
+        {% endif %}
       </div>
     </div>
     {% endfor %}
@@ -127,7 +131,7 @@
               {% endif %}
             </td>
             <td>
-              {% if not t.applied %}
+              {% if not t.applied and current_user_role in ('admin', 'manager') %}
               <form method="POST" action="{{ url_for('treatment_apply', tid=t.id) }}">
                 <button class="btn btn-xs btn-secondary" type="submit">Apply</button>
               </form>
@@ -140,7 +144,7 @@
     </div>
 
     {% set pending = plot_treatments | rejectattr('applied') | list %}
-    {% if pending | length > 1 %}
+    {% if pending | length > 1 and current_user_role in ('admin', 'manager') %}
     <div style="margin-top:14px;">
       <form method="POST" action="{{ url_for('treatment_apply_bulk') }}">
         {% for t in pending %}<input type="hidden" name="ids[]" value="{{ t.id }}">{% endfor %}
