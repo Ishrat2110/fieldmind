@@ -13,6 +13,8 @@ import plotly.graph_objects as go
 import pandas as pd
 import numpy as np
 from datetime import datetime, timezone, timedelta
+import folium
+from streamlit_folium import st_folium
 from database import get_session
 from models import (
     Farm, Field, Plot, InventoryItem, UsageLog,
@@ -432,6 +434,77 @@ with col_detail:
         </div>
         """, unsafe_allow_html=True)
 
+
+# ════════════════════════════════════════════
+# FARM SATELLITE SUBPLOT
+# ════════════════════════════════════════════
+st.markdown('<div class="section-header">Farm Location — Satellite View</div>', unsafe_allow_html=True)
+
+FARM_LAT  =  40.6012   # 851 US-6, Harvard, NE 68944
+FARM_LON  = -98.1056
+FARM_ADDR = "851 US-6, Harvard, NE 68944"
+
+col_sat, col_sat_info = st.columns([2.2, 1])
+
+with col_sat:
+    sat_map = folium.Map(
+        location=[FARM_LAT, FARM_LON],
+        zoom_start=15,
+        tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        attr="Esri World Imagery",
+        max_zoom=19,
+    )
+
+    # Semi-transparent field boundary box (~200 m radius)
+    folium.Rectangle(
+        bounds=[[FARM_LAT - 0.0018, FARM_LON - 0.0028],
+                [FARM_LAT + 0.0018, FARM_LON + 0.0028]],
+        color="#1F6B3A",
+        weight=2.5,
+        fill=True,
+        fill_color="#1F6B3A",
+        fill_opacity=0.10,
+        tooltip="Farm boundary (approx.)"
+    ).add_to(sat_map)
+
+    folium.Marker(
+        location=[FARM_LAT, FARM_LON],
+        tooltip=FARM_ADDR,
+        popup=folium.Popup(
+            f"<b>🌾 Harvard Farm</b><br>{FARM_ADDR}",
+            max_width=220
+        ),
+        icon=folium.Icon(color="green", icon="leaf", prefix="fa"),
+    ).add_to(sat_map)
+
+    # Labels overlay so field borders are still visible
+    folium.TileLayer(
+        tiles="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
+        attr="Esri Labels",
+        name="Labels",
+        overlay=True,
+        opacity=0.7,
+    ).add_to(sat_map)
+
+    st_folium(sat_map, width=None, height=380, returned_objects=[])
+
+with col_sat_info:
+    st.markdown(f"""
+    <div class="detail-card">
+      <div class="detail-title">📍 Farm Address</div>
+      <div class="detail-row"><strong>{FARM_ADDR}</strong></div>
+      <div class="detail-row" style="margin-top:6px">Clay County, Nebraska</div>
+      <div class="detail-row">Lat: {FARM_LAT:.4f}°N</div>
+      <div class="detail-row">Lon: {abs(FARM_LON):.4f}°W</div>
+    </div>
+    <div class="detail-card">
+      <div class="detail-title">🗺️ Map Layers</div>
+      <div class="detail-row">Base: ESRI World Imagery</div>
+      <div class="detail-row">Overlay: Place labels</div>
+      <div class="detail-row">Marker: Farm pin</div>
+      <div class="detail-row" style="margin-top:6px;color:#1F6B3A;font-weight:600">Zoom/pan freely on the map →</div>
+    </div>
+    """, unsafe_allow_html=True)
 
 # ════════════════════════════════════════════
 # DEPLETION FORECAST CHART

@@ -6,27 +6,37 @@
 <title>Sign In — UNL Field Manager</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 
 :root {
-  --bg:        #0C0B09;
-  --surface:   #131108;
-  --surface-2: #1B1915;
-  --border:    #222018;
-  --border-2:  #302C22;
-  --text:      #EDE8D9;
-  --text-2:    #978D7A;
-  --text-3:    #554D3F;
-  --gold:      #C8963C;
-  --gold-dim:  rgba(200,150,60,0.10);
-  --gold-mid:  rgba(200,150,60,0.25);
-  --gold-glow: rgba(200,150,60,0.20);
-  --red:       #BF3F2E;
-  --red-dim:   rgba(191,63,46,0.12);
-  --r:         5px;
-  --mono:      'IBM Plex Mono', ui-monospace, monospace;
-  --serif:     'Playfair Display', Georgia, serif;
+  --mariner-900:  #0F2845;
+  --mariner-700:  #1B3A5C;
+  --mariner-100:  #E6EEF8;
+  --growth-600:   #5C9029;
+  --growth-500:   #7FB83D;
+  --cream:        #FBFAF5;
+  --surface:      #FFFFFF;
+  --surface-2:    #F4F1E9;
+  --border:       #E6E1D3;
+  --border-2:     #CFC8B4;
+  --ink:          #12181F;
+  --ink-2:        #3D4A5C;
+  --ink-3:        #6F7B8B;
+
+  --bg:        var(--cream);
+  --text:      var(--ink);
+  --text-2:    var(--ink-2);
+  --text-3:    var(--ink-3);
+  --gold:      var(--mariner-700);
+  --gold-dim:  var(--mariner-100);
+  --gold-mid:  rgba(27,58,92,0.20);
+  --gold-glow: rgba(27,58,92,0.15);
+  --red:       #C83E3E;
+  --red-dim:   #FBEAEA;
+  --r:         8px;
+  --mono:      'JetBrains Mono', ui-monospace, monospace;
+  --serif:     'Fraunces', Georgia, serif;
   --sans:      'DM Sans', system-ui, sans-serif;
 }
 
@@ -130,18 +140,17 @@ input {
   font-family: var(--sans);
   transition: border-color 150ms, box-shadow 150ms;
   width: 100%;
-  color-scheme: dark;
 }
 input:focus {
   outline: none;
-  border-color: var(--gold);
-  box-shadow: 0 0 0 3px rgba(200,150,60,0.12);
+  border-color: var(--mariner-500);
+  box-shadow: 0 0 0 3px rgba(59,110,176,0.12);
 }
 
 .btn-signin {
   width: 100%;
   padding: 12px;
-  background: var(--gold);
+  background: var(--growth-600);
   color: #fff;
   border: none;
   border-radius: var(--r);
@@ -152,10 +161,11 @@ input:focus {
   margin-top: 6px;
   transition: background 130ms, box-shadow 130ms;
   letter-spacing: 0.01em;
+  box-shadow: 0 2px 8px rgba(92,144,41,0.30);
 }
 .btn-signin:hover {
-  background: #B5842F;
-  box-shadow: 0 4px 20px var(--gold-glow);
+  background: var(--growth-500);
+  box-shadow: 0 4px 20px rgba(92,144,41,0.40);
 }
 
 .login-note {
@@ -179,83 +189,36 @@ input:focus {
 .login-right {
   flex: 1;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 48px;
+  align-items: flex-end;
+  padding: 60px;
   position: relative;
   overflow: hidden;
-}
-
-/* Subtle field-row background pattern */
-.login-right::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image:
-    repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 48px,
-      rgba(200,150,60,0.03) 48px,
-      rgba(200,150,60,0.03) 49px
-    );
-  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(15,40,69,0.25), rgba(15,40,69,0.65)),
+    url('https://images.unsplash.com/photo-1535090042247-30731e4d4b57?auto=format&fit=crop&w=1600&q=80') center/cover;
 }
 
 .login-right-content {
   position: relative;
   max-width: 480px;
-  text-align: center;
-}
-
-.login-stat-group {
-  display: flex;
-  flex-direction: column;
-  gap: 40px;
-  align-items: center;
-}
-
-.login-stat {
-  text-align: center;
-}
-
-.login-stat-num {
-  font-family: var(--serif);
-  font-size: 72px;
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: -0.04em;
-  color: var(--gold);
-  opacity: 0.25;
-  margin-bottom: 8px;
-}
-
-.login-stat-lbl {
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--text-3);
-  font-family: var(--mono);
 }
 
 .login-quote {
   font-family: var(--serif);
-  font-size: 18px;
-  font-style: italic;
-  color: var(--text-3);
-  line-height: 1.6;
-  max-width: 340px;
-  opacity: 0.6;
+  font-size: 32px;
+  font-weight: 600;
+  color: #FFFFFF;
+  line-height: 1.15;
+  max-width: 420px;
+  margin-bottom: 20px;
 }
 
 .login-institution {
   font-size: 10px;
-  color: var(--text-3);
+  color: rgba(255,255,255,0.6);
   font-family: var(--mono);
-  letter-spacing: 0.1em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  margin-top: 16px;
-  opacity: 0.5;
 }
 
 </style>
@@ -285,6 +248,7 @@ input:focus {
   {% endif %}
 
   <form method="POST" action="{{ url_for('login') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="field">
       <label>NUID or UNL Email</label>
       <input type="text" name="identifier"
@@ -309,11 +273,11 @@ input:focus {
 
 </div>
 
-<!-- Right: Decorative panel -->
+<!-- Right: Field photo panel -->
 <div class="login-right">
   <div class="login-right-content">
     <div class="login-quote">
-      "Precision measurement is the foundation of sound agricultural science."
+      Precision research. Shared infrastructure. One farm of record.
     </div>
     <div class="login-institution">University of Nebraska–Lincoln</div>
   </div>

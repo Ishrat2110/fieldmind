@@ -10,13 +10,15 @@ from collections import defaultdict
 
 from flask import (Flask, render_template, request, redirect,
                    url_for, flash, g, Response, session as flask_session)
+from flask_wtf.csrf import CSRFProtect
 from markupsafe import Markup
 from sqlalchemy import func, or_
 from sqlalchemy.orm import joinedload
 from werkzeug.security import check_password_hash
 from database import get_session
 from models import (Farm, InventoryItem, UsageLog, Plot, Equipment,
-                    User, TreatmentPlan, Notification, NotificationStatus)
+                    User, TreatmentPlan, Notification, NotificationStatus,
+                    CropVariety, Field)
 from datetime import datetime, date, timedelta, timezone
 
 app = Flask(__name__)
@@ -28,6 +30,8 @@ if not _secret:
         "and put it in your .env file."
     )
 app.secret_key = _secret
+
+csrf = CSRFProtect(app)
 
 _PUBLIC_ENDPOINTS = {"login", "static"}
 
@@ -436,6 +440,45 @@ def inventory_edit(iid):
     item.last_updated     = datetime.now(timezone.utc)
     s.commit()
     flash(f"'{item.name}' updated.", "success")
+    return redirect(url_for("inventory"))
+
+
+@app.route("/inventory/<int:iid>/receive", methods=["POST"])
+def inventory_receive(iid):
+    s    = db()
+    item = s.get(InventoryItem, iid)
+    if not item:
+        flash("Item not found.", "error")
+        return redirect(url_for("inventory"))
+
+    try:
+        qty_received = float(request.form.get("qty_received", 0))
+    except ValueError:
+        flash("Invalid quantity.", "error")
+        return redirect(url_for("inventory"))
+
+    if qty_received <= 0:
+        flash("Quantity received must be greater than zero.", "error")
+        return redirect(url_for("inventory"))
+
+    item.quantity_on_hand += qty_received
+    item.last_updated = datetime.now(timezone.utc)
+
+    # Auto-dismiss any pending suggestion for this item
+    pending = s.query(Notification).filter_by(
+        inventory_item_id=iid,
+        status=NotificationStatus.pending
+    ).all()
+    for n in pending:
+        n.status = NotificationStatus.approved
+        n.resolved_at = datetime.now(timezone.utc)
+
+    s.commit()
+    flash(
+        f"Received {qty_received:.1f} {item.unit} of {item.name}. "
+        f"New stock: {item.quantity_on_hand:.1f} {item.unit}.",
+        "success"
+    )
     return redirect(url_for("inventory"))
 
 
@@ -898,6 +941,102 @@ def suggestions_refresh():
 
     flash(f"Refreshed — {count} suggestion{'s' if count != 1 else ''} generated.", "success")
     return redirect(url_for("suggestions"))
+
+
+@app.route("/map")
+def farm_map():
+    import json as _json
+    s   = db()
+    ctx = nav_context(s)
+    farm = ctx["farm"]
+
+    plots = (s.query(Plot)
+               .options(
+                   joinedload(Plot.field),
+                   joinedload(Plot.variety).joinedload(CropVariety.growth_stages),
+                   joinedload(Plot.variety).joinedload(CropVariety.species),
+                   joinedload(Plot.treatment_plans).joinedload(TreatmentPlan.inventory_item),
+                   joinedload(Plot.treatment_plans).joinedload(TreatmentPlan.growth_stage),
+               )
+               .all())
+
+    inv_map = {}
+    if farm:
+        for item in s.query(InventoryItem).filter_by(farm_id=farm.id).all():
+            inv_map[item.id] = item
+
+    def _days_since(dt):
+        if not dt:
+            return None
+        return (datetime.now() - dt).days
+
+    def _season_pct(plot):
+        days = _days_since(plot.planting_date)
+        if not days or not plot.variety:
+            return 0
+        total = plot.variety.season_days or 120
+        return min(int(days / total * 100), 100)
+
+    def _current_stage(plot):
+        days = _days_since(plot.planting_date)
+        if not days or not plot.variety or not plot.variety.growth_stages:
+            return None
+        stages = sorted(plot.variety.growth_stages, key=lambda g: g.day_offset)
+        current = None
+        for g in stages:
+            if days >= g.day_offset:
+                current = g
+        return current.stage_code if current else None
+
+    def _upcoming_treatments(plot, days_ahead=21):
+        cutoff = datetime.now() + timedelta(days=days_ahead)
+        return [t for t in plot.treatment_plans
+                if not t.applied and t.planned_date and t.planned_date <= cutoff]
+
+    def _stock_ok(item):
+        if not item or not item.reorder_threshold:
+            return True
+        return item.quantity_on_hand > item.reorder_threshold
+
+    plots_data = []
+    for p in plots:
+        up = _upcoming_treatments(p)
+        has_low_stock = any(
+            t.inventory_item_id in inv_map and not _stock_ok(inv_map[t.inventory_item_id])
+            for t in up
+        )
+        species = p.variety.species.common_name if p.variety and p.variety.species else "Unknown"
+        plots_data.append({
+            "id":           p.id,
+            "plot_code":    p.plot_code,
+            "field":        p.field.name if p.field else "Unknown",
+            "variety":      p.variety.variety_code if p.variety else "—",
+            "species":      species,
+            "is_exp":       p.variety.is_experimental if p.variety else False,
+            "replication":  p.replication,
+            "area_ha":      p.area_ha,
+            "planting_date": p.planting_date.strftime("%b %d, %Y") if p.planting_date else None,
+            "days_in_field": _days_since(p.planting_date),
+            "season_pct":   _season_pct(p),
+            "stage":        _current_stage(p),
+            "has_low_stock": has_low_stock,
+            "upcoming": [
+                {
+                    "item":  t.inventory_item.name if t.inventory_item else "—",
+                    "stage": t.growth_stage.stage_code if t.growth_stage else "—",
+                    "date":  t.planned_date.strftime("%b %d") if t.planned_date else "—",
+                    "qty":   round(t.rate_per_ha * (p.area_ha or 0), 1),
+                    "unit":  t.inventory_item.unit if t.inventory_item else "",
+                    "low":   t.inventory_item_id in inv_map and not _stock_ok(inv_map[t.inventory_item_id]),
+                }
+                for t in up
+            ],
+        })
+
+    return render_template("map.html",
+        page="map",
+        plots_json=_json.dumps(plots_data),
+        **ctx)
 
 
 if __name__ == "__main__":

@@ -17,6 +17,7 @@
     <span class="section-title">Overdue</span>
     {% if overdue | length > 1 and current_user_role in ('admin', 'manager') %}
     <form method="POST" action="{{ url_for('treatment_apply_bulk') }}" style="display:inline;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       {% for t in overdue %}<input type="hidden" name="ids[]" value="{{ t.id }}">{% endfor %}
       <button type="submit" class="btn btn-secondary btn-sm">Mark all {{ overdue | length }} applied</button>
     </form>
@@ -34,6 +35,7 @@
       <div class="alert-actions">
         {% if current_user_role in ('admin', 'manager') %}
         <form method="POST" action="{{ url_for('treatment_apply', tid=t.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button class="btn btn-secondary btn-sm" type="submit">Mark Applied</button>
         </form>
         {% endif %}
@@ -67,6 +69,7 @@
       <div class="alert-actions">
         {% if current_user_role in ('admin', 'manager') %}
         <form method="POST" action="{{ url_for('treatment_apply', tid=t.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button class="btn btn-secondary btn-sm" type="submit">Mark Applied</button>
         </form>
         {% endif %}
@@ -133,6 +136,7 @@
             <td>
               {% if not t.applied and current_user_role in ('admin', 'manager') %}
               <form method="POST" action="{{ url_for('treatment_apply', tid=t.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button class="btn btn-xs btn-secondary" type="submit">Apply</button>
               </form>
               {% endif %}
@@ -147,6 +151,7 @@
     {% if pending | length > 1 and current_user_role in ('admin', 'manager') %}
     <div style="margin-top:14px;">
       <form method="POST" action="{{ url_for('treatment_apply_bulk') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         {% for t in pending %}<input type="hidden" name="ids[]" value="{{ t.id }}">{% endfor %}
         <button type="submit" class="btn btn-secondary btn-sm">Mark all {{ pending | length }} pending as applied</button>
       </form>

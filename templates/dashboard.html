@@ -3,6 +3,32 @@
 
 {% block content %}
 
+<div class="hero">
+  <div class="hero-image">
+    <img src="https://images.unsplash.com/photo-1625246333195-78d9c38ad449?auto=format&fit=crop&w=1600&q=80"
+         alt="Cornfield at sunrise">
+    <div class="hero-overlay"></div>
+  </div>
+  <div class="hero-content">
+    <div class="hero-eyebrow">{{ farm.name if farm else 'Research Farm' }}</div>
+    <h1 class="hero-title">Growing what's next.</h1>
+    <p class="hero-sub">
+      {% if today_logs %}
+        {{ today_logs | length }} usage event{{ 's' if today_logs|length != 1 else '' }} logged today.
+      {% else %}
+        No usage logged today — start tracking from the sidebar.
+      {% endif %}
+      {% if critical_count %}
+        <span class="hero-alert">{{ critical_count }} item{{ 's' if critical_count != 1 else '' }} critically low.</span>
+      {% endif %}
+    </p>
+    <div class="hero-actions">
+      <a href="{{ url_for('log_usage') }}" class="hero-btn hero-btn-primary">Log usage</a>
+      <a href="{{ url_for('suggestions') }}" class="hero-btn hero-btn-ghost">View reorder suggestions →</a>
+    </div>
+  </div>
+</div>
+
 <div class="page-header">
   <div>
     <div class="page-title">Overview</div>
@@ -64,6 +90,7 @@
         </div>
         <div class="alert-action">
           <form method="POST" action="{{ url_for('treatment_apply', tid=t.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button class="btn btn-secondary btn-sm" type="submit">Apply</button>
           </form>
         </div>
@@ -161,9 +188,11 @@
       {% if current_user_role in ('admin', 'manager') %}
       <div style="display:flex; gap:6px; flex-shrink:0;">
         <form method="POST" action="{{ url_for('suggestion_approve', nid=sug.id) }}" style="margin:0;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button type="submit" class="btn btn-primary btn-xs">Approve</button>
         </form>
         <form method="POST" action="{{ url_for('suggestion_dismiss', nid=sug.id) }}" style="margin:0;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button type="submit" class="btn btn-ghost btn-xs">Dismiss</button>
         </form>
       </div>
@@ -239,7 +268,6 @@
 </div>
 
 <script>
-  // Inject today's date in serif italic style
   const d = new Date();
   const opts = { month: 'long', day: 'numeric', year: 'numeric' };
   document.getElementById('today-date').textContent = d.toLocaleDateString('en-US', opts);

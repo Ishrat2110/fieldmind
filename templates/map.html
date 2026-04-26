@@ -1,0 +1,265 @@
+{% extends "base.html" %}
+{% block title %}Farm Map{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+
+<div class="page-header">
+  <div>
+    <div class="page-title">Farm Map</div>
+    <div class="page-sub">Click any plot to inspect · 851 US-6, Harvard, NE 68944</div>
+  </div>
+</div>
+
+<!-- ── PLOT GRID + DETAIL PANEL ── -->
+<div style="display:grid; grid-template-columns:1fr 280px; gap:24px; margin-bottom:36px; align-items:start;">
+
+  <div class="section" style="padding:20px;">
+    <div class="section-head">
+      <div class="section-title">Field Layout</div>
+      <div style="display:flex;gap:16px;font-size:11px;font-family:var(--mono);color:var(--text-3);">
+        <span style="display:flex;align-items:center;gap:5px;">
+          <span style="width:10px;height:10px;border-radius:2px;background:rgba(245,158,11,0.3);border:1.5px solid #f59e0b;display:inline-block;"></span>Corn
+        </span>
+        <span style="display:flex;align-items:center;gap:5px;">
+          <span style="width:10px;height:10px;border-radius:2px;background:rgba(59,130,246,0.3);border:1.5px solid #3b82f6;display:inline-block;"></span>Soybean
+        </span>
+        <span style="display:flex;align-items:center;gap:5px;">
+          <span style="width:10px;height:10px;border-radius:2px;background:rgba(200,62,62,0.15);border:2px solid #C83E3E;display:inline-block;"></span>Low stock
+        </span>
+      </div>
+    </div>
+    <div id="plot-map" style="width:100%;height:400px;"></div>
+  </div>
+
+  <div id="detail-panel">
+    <div class="section" style="padding:20px;text-align:center;color:var(--text-3);">
+      <div style="font-size:28px;margin-bottom:10px;">🗺️</div>
+      <div style="font-size:12px;font-family:var(--mono);">Click any plot<br>to see details</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── SATELLITE MAP ── -->
+<div class="section" style="padding:20px;margin-bottom:36px;">
+  <div class="section-head">
+    <div class="section-title">Farm Location — Satellite View</div>
+    <span style="font-size:11px;color:var(--text-3);font-family:var(--mono);">851 US-6, Harvard, NE 68944</span>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 220px;gap:18px;align-items:start;">
+    <div id="sat-map" style="height:380px;border-radius:8px;overflow:hidden;border:1px solid var(--border);"></div>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div class="section" style="padding:14px;">
+        <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:8px;">📍 Farm Address</div>
+        <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px;">851 US-6</div>
+        <div style="font-size:12px;color:var(--text-3);">Harvard, NE 68944</div>
+        <div style="font-size:12px;color:var(--text-3);margin-top:2px;">Clay County, Nebraska</div>
+        <div style="font-size:11px;font-family:var(--mono);color:var(--text-3);margin-top:8px;padding-top:8px;border-top:1px solid var(--border);">
+          40.6012° N<br>98.1056° W
+        </div>
+      </div>
+      <div class="section" style="padding:14px;">
+        <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:8px;">🗺️ Map Layers</div>
+        <div style="font-size:11px;color:var(--text-3);line-height:1.8;">
+          Satellite: ESRI World Imagery<br>
+          Labels: Place &amp; road names<br>
+          <span style="color:var(--green);font-weight:600;">Zoom &amp; pan freely →</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const PLOTS = {{ plots_json | safe }};
+
+// ── Color palettes ──
+const CORN_COLORS = ["#f59e0b","#f97316","#ef4444","#dc2626","#b45309","#d97706","#ea580c","#c2410c"];
+const SOY_COLORS  = ["#3b82f6","#6366f1","#8b5cf6","#06b6d4","#0284c7","#4f46e5","#7c3aed","#0891b2"];
+const varietyColorMap = {};
+let cornIdx = 0, soyIdx = 0;
+PLOTS.forEach(p => {
+  if (!(p.variety in varietyColorMap)) {
+    varietyColorMap[p.variety] = p.species === "Corn"
+      ? CORN_COLORS[cornIdx++ % CORN_COLORS.length]
+      : SOY_COLORS[soyIdx++ % SOY_COLORS.length];
+  }
+});
+
+// ── Group by field ──
+const fields = {};
+PLOTS.forEach(p => {
+  if (!fields[p.field]) fields[p.field] = [];
+  fields[p.field].push(p);
+});
+
+const CELL_W = 1.8, CELL_H = 1.2, GAP = 0.25, FIELD_GAP = 1.2;
+const shapes = [], annotations = [], traces = [];
+
+Object.entries(fields).forEach(([fname, fplots], fi) => {
+  const ox = fi * (4 * (CELL_W + GAP) + FIELD_GAP);
+  const fw = 4 * CELL_W + 3 * GAP;
+  const fh = 2 * CELL_H + GAP;
+
+  // Field background
+  shapes.push({ type:"rect", x0:ox-0.15, y0:-0.35, x1:ox+fw+0.15, y1:fh+0.55,
+    fillcolor:"rgba(92,144,41,0.04)", line:{color:"rgba(92,144,41,0.2)",width:1.5}, layer:"below" });
+  annotations.push({ x:ox+fw/2, y:fh+0.38, text:`<b>${fname}</b>`, showarrow:false,
+    font:{size:13,color:"#1B3A5C",family:"DM Sans"}, xanchor:"center" });
+
+  fplots.sort((a,b) => a.plot_code.localeCompare(b.plot_code));
+
+  fplots.forEach((plot, i) => {
+    const col = i % 4, row = Math.floor(i / 4);
+    const x0 = ox + col*(CELL_W+GAP), y0 = row*(CELL_H+GAP);
+    const x1 = x0+CELL_W, y1 = y0+CELL_H;
+    const color = varietyColorMap[plot.variety] || "#888";
+    const rgb = parseInt(color.slice(1),16);
+    const r=(rgb>>16)&255, g=(rgb>>8)&255, b=rgb&255;
+
+    // Cell fill
+    shapes.push({ type:"rect", x0,y0,x1,y1,
+      fillcolor:`rgba(${r},${g},${b},0.18)`,
+      line:{color: plot.has_low_stock ? "#C83E3E" : color, width: plot.has_low_stock ? 2.5 : 1.5},
+      layer:"below" });
+
+    // Season progress bar
+    const barW = (CELL_W-0.2)*(plot.season_pct/100);
+    shapes.push({ type:"rect", x0:x0+0.1,y0:y0+0.08,x1:x1-0.1,y1:y0+0.2,
+      fillcolor:"rgba(0,0,0,0.08)", line:{width:0}, layer:"below" });
+    if (barW > 0) shapes.push({ type:"rect", x0:x0+0.1,y0:y0+0.08,x1:x0+0.1+barW,y1:y0+0.2,
+      fillcolor:"#5C9029", line:{width:0}, layer:"above" });
+
+    // Hover scatter
+    const hoverLines = [
+      `<b>${plot.plot_code}</b>${plot.has_low_stock?" ⚠️":""}`,
+      `Variety: ${plot.variety}`,
+      `Species: ${plot.species}`,
+      `Rep: ${plot.replication}`,
+      `Stage: ${plot.stage||"—"} · ${plot.days_in_field||"?"}d`,
+      `Season: ${plot.season_pct}%`,
+      `<i>Click to inspect →</i>`
+    ].join("<br>");
+
+    traces.push({
+      x:[(x0+x1)/2], y:[(y0+y1)/2],
+      mode:"text",
+      text:[`<b>${plot.plot_code}</b><br><span style="font-size:10px">${plot.variety}</span><br><span style="font-size:9px">${plot.stage||"—"}</span>`],
+      textfont:{size:11,color:"#12181F",family:"DM Sans"},
+      hovertemplate: hoverLines+"<extra></extra>",
+      customdata:[[plot.id]],
+      name:plot.plot_code,
+      showlegend:false,
+    });
+
+    if (plot.has_low_stock) {
+      traces.push({ x:[x1-0.15],y:[y1-0.15], mode:"markers+text",
+        marker:{color:"#C83E3E",size:12,symbol:"circle"},
+        text:["!"], textfont:{size:8,color:"white"}, textposition:"middle center",
+        hoverinfo:"skip", showlegend:false });
+    }
+  });
+});
+
+const layout = {
+  shapes, annotations,
+  xaxis:{visible:false, range:[-0.5, Object.keys(fields).length*(4*(CELL_W+GAP)+FIELD_GAP)+1]},
+  yaxis:{visible:false, range:[-0.6, 3.4]},
+  margin:{l:10,r:10,t:10,b:10},
+  plot_bgcolor:"rgba(0,0,0,0)", paper_bgcolor:"rgba(0,0,0,0)",
+  height:400, dragmode:false,
+  hoverlabel:{bgcolor:"white",bordercolor:"#5C9029",font:{family:"DM Sans",size:12}},
+};
+
+const mapDiv = document.getElementById("plot-map");
+Plotly.newPlot(mapDiv, traces, layout, {displayModeBar:false, responsive:true});
+
+// ── Click handler ──
+mapDiv.on("plotly_click", function(data) {
+  try {
+    const pt = data.points[0];
+    const plotId = pt.customdata[0];
+    const plot = PLOTS.find(p => p.id === plotId);
+    if (!plot) return;
+    showDetail(plot);
+  } catch(e) {}
+});
+
+function showDetail(p) {
+  const badgeType = p.species === "Corn"
+    ? "background:#fff8e6;color:#b45309;"
+    : "background:#e6f0ff;color:#1d4ed8;";
+  const expBadge = p.is_exp
+    ? `<span style="padding:2px 8px;border-radius:3px;font-size:9px;font-weight:600;background:#fff3cd;color:#856404;font-family:var(--mono);">EXPERIMENTAL</span>`
+    : `<span style="padding:2px 8px;border-radius:3px;font-size:9px;font-weight:600;background:#e8f5ee;color:#1F6B3A;font-family:var(--mono);">COMMERCIAL</span>`;
+
+  const progressBar = `
+    <div style="background:var(--border-2);border-radius:2px;height:6px;margin:6px 0;overflow:hidden;">
+      <div style="height:100%;border-radius:2px;background:var(--green);width:${p.season_pct}%;"></div>
+    </div>`;
+
+  let treatmentsHtml = "";
+  if (p.upcoming.length) {
+    treatmentsHtml = `
+      <div class="section" style="padding:14px;margin-top:12px;">
+        <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:10px;">Upcoming Treatments</div>
+        ${p.upcoming.map(t => `
+          <div style="padding:7px 0;border-bottom:1px solid var(--border);font-size:12px;">
+            <div style="font-weight:600;color:var(--text);">${t.item}</div>
+            <div style="font-family:var(--mono);font-size:10px;color:var(--text-3);margin-top:2px;">
+              ${t.stage} · ${t.qty} ${t.unit} · ${t.date}
+              ${t.low ? `<span style="margin-left:5px;padding:1px 5px;background:var(--red-dim);color:var(--red);border-radius:3px;">low stock</span>` : ""}
+            </div>
+          </div>`).join("")}
+      </div>`;
+  } else {
+    treatmentsHtml = `<div class="section" style="padding:14px;margin-top:12px;font-size:11px;font-family:var(--mono);color:var(--text-3);">No treatments due in next 21 days.</div>`;
+  }
+
+  document.getElementById("detail-panel").innerHTML = `
+    <div class="section" style="padding:18px;">
+      <div style="font-size:16px;font-weight:700;color:var(--text);font-family:var(--serif);margin-bottom:8px;">
+        Plot ${p.plot_code}
+      </div>
+      <span style="padding:2px 8px;border-radius:3px;font-size:9px;font-weight:600;${badgeType};font-family:var(--mono);">${p.species.toUpperCase()}</span>
+      ${expBadge}
+      <div style="margin-top:14px;display:flex;flex-direction:column;gap:6px;">
+        <div style="font-size:12px;color:var(--text-2);"><strong>Variety:</strong> ${p.variety}</div>
+        <div style="font-size:12px;color:var(--text-2);"><strong>Field:</strong> ${p.field}</div>
+        <div style="font-size:12px;color:var(--text-2);"><strong>Replication:</strong> ${p.replication}</div>
+        <div style="font-size:12px;color:var(--text-2);"><strong>Area:</strong> ${p.area_ha ? p.area_ha + " ha" : "—"}</div>
+        <div style="font-size:12px;color:var(--text-2);"><strong>Planted:</strong> ${p.planting_date || "—"}</div>
+        <div style="font-size:12px;color:var(--text-2);"><strong>Days in field:</strong> ${p.days_in_field ?? "—"}</div>
+      </div>
+      <div style="margin-top:14px;">
+        <div style="font-size:11px;color:var(--text-3);font-family:var(--mono);">Stage: ${p.stage || "—"} · Season ${p.season_pct}%</div>
+        ${progressBar}
+      </div>
+    </div>
+    ${treatmentsHtml}`;
+}
+
+// ── Satellite map ──
+const FARM_LAT = 40.6012, FARM_LON = -98.1056;
+const satMap = L.map("sat-map", {scrollWheelZoom:true}).setView([FARM_LAT, FARM_LON], 15);
+L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+  {attribution:"Esri",maxZoom:19}).addTo(satMap);
+L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
+  {attribution:"",maxZoom:19,opacity:0.7}).addTo(satMap);
+L.rectangle([[FARM_LAT-0.0018,FARM_LON-0.0028],[FARM_LAT+0.0018,FARM_LON+0.0028]],
+  {color:"#5C9029",weight:2.5,fill:true,fillColor:"#5C9029",fillOpacity:0.10})
+  .addTo(satMap).bindTooltip("Farm boundary (approx.)");
+const icon = L.divIcon({
+  html:`<div style="background:#5C9029;width:14px;height:14px;border-radius:50%;border:2.5px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.4);"></div>`,
+  iconSize:[14,14], iconAnchor:[7,7], className:""
+});
+L.marker([FARM_LAT,FARM_LON],{icon})
+  .addTo(satMap)
+  .bindPopup("<b>🌾 Harvard Farm</b><br>851 US-6, Harvard, NE 68944")
+  .openPopup();
+</script>
+
+{% endblock %}
