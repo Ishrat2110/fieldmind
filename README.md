@@ -76,7 +76,7 @@ graph TB
         E[FastAPI — api.py<br/>REST API · Usage Wizard]
     end
 
-    subgraph AI & Visualization
+    subgraph AIViz["AI & Visualization"]
         F[Gemini — ai_engine.py<br/>Predictions · Alerts]
         G[Plotly — farm_map.py<br/>Plot Map · Forecasts]
         H[Geopandas — shapefile_analyzer.py<br/>GIS Analysis]
@@ -96,7 +96,7 @@ graph TB
 
     style Frontend fill:#fef3c7,stroke:#d97706,color:#000
     style Backend fill:#dbeafe,stroke:#2563eb,color:#000
-    style AI & Visualization fill:#ede9fe,stroke:#7c3aed,color:#000
+    style AIViz fill:#ede9fe,stroke:#7c3aed,color:#000
     style Data fill:#dcfce7,stroke:#16a34a,color:#000
 ```
 
