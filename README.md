@@ -149,8 +149,14 @@ cp .env.example .env
 | Variable | Required | Description |
 |----------|----------|------------|
 | `DATABASE_URL` | yes | SQLAlchemy URL — defaults to `sqlite:///farm_manager.db` (relative). For an absolute path use four slashes: `sqlite:////abs/path/farm_manager.db` |
-| `SECRET_KEY` | yes | Flask session secret |
-| `GEMINI_API_KEY` | optional | Google Gemini API key. If unset, reorder suggestions fall back to rule-based logic |
+| `SECRET_KEY` | yes | Flask session-cookie signing key. **Generate your own** — see below. |
+| `GEMINI_API_KEY` | optional | Google Gemini API key. If unset, reorder suggestions fall back to rule-based logic. |
+
+> **Generating `SECRET_KEY`:** it's not a key you fetch from anywhere — you create it yourself. Any random string works; the easiest way is:
+> ```bash
+> python -c "import secrets; print(secrets.token_hex(32))"
+> ```
+> Copy the output into `.env` as `SECRET_KEY=<value>`.
 
 ### Initialize Database
 
