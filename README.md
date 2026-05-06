@@ -19,7 +19,28 @@
 
 Built for the **University of Nebraska–Lincoln** Department of Biological Systems Engineering.
 
+**AGST 492 — Agentic AI for Workflow Automation · Spring 2026**
+
 </div>
+
+---
+
+## :page_facing_up: Project Deliverables
+
+<div align="center">
+
+| Document | Description | Link |
+|----------|-------------|------|
+| :bar_chart: **Presentation** | Final slide deck (AGST 492 submission) | [FieldMind_Presentation.pptx](docs/FieldMind_Presentation.pptx) |
+| :memo: **Project Report** | 3-page written report | [FieldMind_Report.pdf](docs/FieldMind_Report.pdf) |
+
+</div>
+
+---
+
+## :world_map: System Overview
+
+![FieldMind System Overview — Beyond the Spreadsheet](docs/infographic.png)
 
 ---
 
@@ -227,8 +248,12 @@ fieldmind/
 │   ├── suggestions.html       # AI reorder suggestions
 │   └── users.html             # User management
 │
+├── docs/
+│   ├── infographic.png              # System overview infographic
+│   ├── FieldMind_Report.pdf         # Project report (AGST 492)
+│   └── FieldMind_Presentation.pptx  # Final presentation slides
+│
 ├── tests/                     # pytest suite + smoke test
-├── docs/                      # Step-by-step design notes
 ├── requirements.txt
 ├── Nebraska_N_RGB.png         # UNL brand mark
 └── .gitignore
@@ -240,7 +265,7 @@ fieldmind/
 
 ### Built at the University of Nebraska–Lincoln
 
-Department of Biological Systems Engineering
+Department of Biological Systems Engineering · AGST 492 Spring 2026
 
 <img src="Nebraska_N_RGB.png" alt="UNL" width="40" />
 
