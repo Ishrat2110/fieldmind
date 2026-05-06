@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>{% block title %}Field Manager{% endblock %} — UNL Research</title>
+<title>{% block title %}FieldMind{% endblock %} — UNL Research</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -119,7 +119,45 @@ a { color: inherit; text-decoration: none; }
   justify-content: center;
   color: var(--gold);
   flex-shrink: 0;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  transition: transform 0.18s cubic-bezier(0.4, 0, 0.2, 1),
+              background 0.18s cubic-bezier(0.4, 0, 0.2, 1);
 }
+.sidebar-icon:hover { transform: scale(1.05); background: var(--gold-mid); }
+.sidebar-icon:active { transform: scale(0.95); }
+.sidebar-icon:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+/* sidebar collapse / reopen */
+.sidebar { transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1); }
+.main    { transition: margin-left 0.22s cubic-bezier(0.4, 0, 0.2, 1); }
+body.sidebar-collapsed .sidebar { transform: translateX(-100%); }
+body.sidebar-collapsed .main    { margin-left: 0; }
+
+.sidebar-open-btn {
+  position: fixed;
+  top: 18px; left: 18px;
+  z-index: 200;
+  width: 38px; height: 38px;
+  background: var(--sidebar);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--gold);
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  box-shadow: 0 8px 24px -12px rgba(0,0,0,0.45);
+  transition: transform 0.18s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0;
+}
+.sidebar-open-btn:hover  { transform: scale(1.06); }
+.sidebar-open-btn:active { transform: scale(0.94); }
+.sidebar-open-btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+body.sidebar-collapsed .sidebar-open-btn { display: flex; opacity: 1; }
 
 .sidebar-wordmark {
   font-family: var(--serif);
@@ -915,6 +953,17 @@ hr { border: none; border-top: 1px solid var(--border); margin: 36px 0; }
 </head>
 <body>
 
+<script>
+  // pre-paint: restore collapsed state so the sidebar doesn't flash open on every nav
+  if (localStorage.getItem('sidebarCollapsed') === '1') document.body.classList.add('sidebar-collapsed');
+</script>
+
+<button type="button" class="sidebar-open-btn" id="sidebarOpen" aria-label="Open sidebar" aria-controls="sidebar" aria-expanded="false">
+  <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
+  </svg>
+</button>
+
 <div class="layout">
 
 <!-- ── SIDEBAR ───────────────────────────────────────── -->
@@ -922,16 +971,16 @@ hr { border: none; border-top: 1px solid var(--border); margin: 36px 0; }
 
   <div class="sidebar-brand">
     <div class="sidebar-logo-row">
-      <div class="sidebar-icon">
+      <button type="button" class="sidebar-icon" id="sidebarToggle" aria-label="Collapse sidebar" aria-controls="sidebar" aria-expanded="true">
         <!-- Seedling / field rows icon -->
-        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
           <path stroke-linecap="round" stroke-linejoin="round" d="M3 7h18M3 12h18M3 17h18"/>
           <circle cx="7" cy="7" r="1.5" fill="currentColor" stroke="none"/>
           <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/>
           <circle cx="17" cy="17" r="1.5" fill="currentColor" stroke="none"/>
         </svg>
-      </div>
-      <div class="sidebar-wordmark">Field Manager</div>
+      </button>
+      <div class="sidebar-wordmark">FieldMind</div>
     </div>
     <div class="sidebar-farm-info">
       {{ farm.name if farm else 'UNL Research Farm' }}<br>
@@ -1128,6 +1177,25 @@ hr { border: none; border-top: 1px solid var(--border); margin: 36px 0; }
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closePanel(); });
 
   document.querySelector('.main').classList.add('loaded');
+
+  // sidebar toggle (collapse / reopen) — state persists across page loads
+  (function() {
+    const toggleBtn = document.getElementById('sidebarToggle');
+    const openBtn   = document.getElementById('sidebarOpen');
+    function setCollapsed(collapsed) {
+      document.body.classList.toggle('sidebar-collapsed', collapsed);
+      localStorage.setItem('sidebarCollapsed', collapsed ? '1' : '0');
+      if (toggleBtn) {
+        toggleBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        toggleBtn.setAttribute('aria-label', collapsed ? 'Open sidebar' : 'Collapse sidebar');
+      }
+      if (openBtn) openBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    }
+    if (toggleBtn) toggleBtn.addEventListener('click', () => setCollapsed(!document.body.classList.contains('sidebar-collapsed')));
+    if (openBtn)   openBtn.addEventListener('click',   () => setCollapsed(false));
+    // sync aria on initial load (in case pre-paint script restored collapsed state)
+    setCollapsed(document.body.classList.contains('sidebar-collapsed'));
+  })();
 
   document.querySelectorAll('a.nav-item').forEach(link => {
     link.addEventListener('click', function(e) {
