@@ -146,10 +146,11 @@ cp .env.example .env
 
 ### Environment Variables
 
-| Variable | Description |
-|----------|------------|
-| `GEMINI_API_KEY` | Google Gemini API key for AI predictions |
-| `SECRET_KEY` | Flask session secret |
+| Variable | Required | Description |
+|----------|----------|------------|
+| `DATABASE_URL` | yes | SQLAlchemy URL — defaults to `sqlite:///farm_manager.db` (relative). For an absolute path use four slashes: `sqlite:////abs/path/farm_manager.db` |
+| `SECRET_KEY` | yes | Flask session secret |
+| `GEMINI_API_KEY` | optional | Google Gemini API key. If unset, reorder suggestions fall back to rule-based logic |
 
 ### Initialize Database
 
