@@ -25,22 +25,21 @@ Built for the **University of Nebraska–Lincoln** Department of Biological Syst
 
 ---
 
-## :page_facing_up: Project Deliverables
+## Beyond the Spreadsheet — System Overview
+
+![FieldMind System Overview](docs/infographic.png)
 
 <div align="center">
 
-| Document | Description | Link |
-|----------|-------------|------|
-| :bar_chart: **Presentation** | Final slide deck (AGST 492 submission) | [FieldMind_Presentation.pptx](docs/FieldMind_Presentation.pptx) |
-| :memo: **Project Report** | 3-page written report | [FieldMind_Report.pdf](docs/FieldMind_Report.pdf) |
+<a href="docs/FieldMind_Report.pdf">
+  <img src="https://img.shields.io/badge/Project_Report-PDF-D00000?style=for-the-badge&logo=adobeacrobatreader&logoColor=white" alt="Project Report PDF"/>
+</a>
+&nbsp;&nbsp;
+<a href="docs/FieldMind_Presentation.pptx">
+  <img src="https://img.shields.io/badge/Final_Presentation-PPTX-D24726?style=for-the-badge&logo=microsoftpowerpoint&logoColor=white" alt="Final Presentation PPTX"/>
+</a>
 
 </div>
-
----
-
-## :world_map: System Overview
-
-![FieldMind System Overview — Beyond the Spreadsheet](docs/infographic.png)
 
 ---
 
