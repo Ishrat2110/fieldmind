@@ -35,6 +35,11 @@ if not DATABASE_URL:
         "Semester_project/farm_manager_step1/farm_manager.db"
     )
 
+# Seed-user passwords — override via env vars; defaults are demo-only
+_ADMIN_PW   = os.environ.get("SEED_ADMIN_PASSWORD",   "admin123")
+_MANAGER_PW = os.environ.get("SEED_MANAGER_PASSWORD", "manager123")
+_VIEWER_PW  = os.environ.get("SEED_VIEWER_PASSWORD",  "viewer2024")
+
 engine = create_engine(DATABASE_URL, echo=False)
 Session = sessionmaker(bind=engine)
 
@@ -83,17 +88,17 @@ def seed_db():
 
     # ── USERS ──────────────────────────────────────
     users_data = [
-        # (name,                  email,                   nuid,       password,       role)
-        ("Ishrat Jandu",          "ijandu@unl.edu",        "12345678", "admin123",     UserRole.admin),
-        ("Marcus Webb",           "mwebb2@unl.edu",        "87654321", "manager123",   UserRole.manager),
-        ("Sara Okonkwo",          "sokonkwo@unl.edu",      "23456789", "sara2024",     UserRole.manager),
-        ("Daniel Reyes",          "dreyes3@unl.edu",       "34567890", "dreyes2024",   UserRole.viewer),
-        ("Priya Nair",            "pnair@unl.edu",         "45678901", "pnair2024",    UserRole.viewer),
-        ("Tom Hartmann",          "thartmann@unl.edu",     "56789012", "tomh2024",     UserRole.viewer),
-        ("Aisha Kamara",          "akamara2@unl.edu",      "67890123", "aisha2024",    UserRole.viewer),
-        ("Levi Schultz",          "lschultz4@unl.edu",     "78901234", "levi2024",     UserRole.viewer),
-        ("Mei-Ling Chen",         "mchen5@unl.edu",        "89012345", "meiling2024",  UserRole.viewer),
-        ("James Oduya",           "joduya@unl.edu",        "90123456", "james2024",    UserRole.viewer),
+        # (name,                  email,                   nuid,       password,     role)
+        ("Ishrat Jandu",          "ijandu@unl.edu",        "12345678", _ADMIN_PW,    UserRole.admin),
+        ("Marcus Webb",           "mwebb2@unl.edu",        "87654321", _MANAGER_PW,  UserRole.manager),
+        ("Sara Okonkwo",          "sokonkwo@unl.edu",      "23456789", _MANAGER_PW,  UserRole.manager),
+        ("Daniel Reyes",          "dreyes3@unl.edu",       "34567890", _VIEWER_PW,   UserRole.viewer),
+        ("Priya Nair",            "pnair@unl.edu",         "45678901", _VIEWER_PW,   UserRole.viewer),
+        ("Tom Hartmann",          "thartmann@unl.edu",     "56789012", _VIEWER_PW,   UserRole.viewer),
+        ("Aisha Kamara",          "akamara2@unl.edu",      "67890123", _VIEWER_PW,   UserRole.viewer),
+        ("Levi Schultz",          "lschultz4@unl.edu",     "78901234", _VIEWER_PW,   UserRole.viewer),
+        ("Mei-Ling Chen",         "mchen5@unl.edu",        "89012345", _VIEWER_PW,   UserRole.viewer),
+        ("James Oduya",           "joduya@unl.edu",        "90123456", _VIEWER_PW,   UserRole.viewer),
     ]
 
     user_objects = []
