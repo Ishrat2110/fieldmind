@@ -7,8 +7,8 @@
 ### AI-Powered Research Farm Manager
 
 [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
-[![Flask](https://img.shields.io/badge/Flask-Backend-000000?style=for-the-badge&logo=flask)](https://flask.palletsprojects.com)
-[![FastAPI](https://img.shields.io/badge/FastAPI-REST_API-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![Flask](https://img.shields.io/badge/Flask-Web_App-000000?style=for-the-badge&logo=flask)](https://flask.palletsprojects.com)
+[![Streamlit](https://img.shields.io/badge/Streamlit-Visualization-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://streamlit.io)
 [![Gemini](https://img.shields.io/badge/Google_Gemini-AI_Engine-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://ai.google.dev)
 [![SQLite](https://img.shields.io/badge/SQLite-Database-003B57?style=for-the-badge&logo=sqlite&logoColor=white)](https://sqlite.org)
 [![UNL](https://img.shields.io/badge/UNL-Biological_Systems_Engineering-D00000?style=for-the-badge)](https://engineering.unl.edu/bse/)
@@ -35,8 +35,8 @@ Track fertilizers, herbicides, fungicides, fuel, and seed with reorder threshold
 ### :calendar: Treatment Planning
 Schedule plot-level treatments tied to crop growth stages. Overdue and upcoming treatments surface automatically on the dashboard.
 
-### :memo: Usage Logging Wizard
-4-step guided flow: select item → pick plot → choose equipment → confirm. AI pre-fills estimated quantities. Logs auto-deplete inventory.
+### :memo: Usage Logging
+Guided flow: select item → pick plot → choose equipment → confirm. Logs auto-deplete inventory on submission.
 
 ### :bar_chart: History & Export
 Filterable usage history with pagination and CSV export. Filter by item, time period, and source (manual vs. AI-estimated).
@@ -44,8 +44,8 @@ Filterable usage history with pagination and CSV export. Filter by item, time pe
 </td>
 <td width="50%">
 
-### :brain: AI Estimation Engine
-Google Gemini predicts daily consumption rates, forecasts stockout dates, generates plain-English alerts, and learns from farmer corrections over time.
+### :brain: AI Reorder Suggestions
+Gemini-backed reorder engine forecasts stockout dates, generates plain-English alerts, and surfaces suggestions when items hit threshold.
 
 ### :world_map: Interactive Farm Map
 Plotly-powered plot visualization — click any plot for variety details, treatment history, and growth stage info. Includes inventory depletion forecast curves.
@@ -54,7 +54,7 @@ Plotly-powered plot visualization — click any plot for variety details, treatm
 Upload farm shapefiles to visualize field boundaries, color polygons by any attribute, view the full attribute table, and match to database records.
 
 ### :lock: Role-Based Auth
-UNL email authentication with admin / manager / viewer roles, session management, and per-request authorization.
+UNL email authentication with admin / manager / viewer roles, session management, CSRF protection, and per-request authorization.
 
 </td>
 </tr>
@@ -67,13 +67,13 @@ UNL email authentication with admin / manager / viewer roles, session management
 ```mermaid
 graph TB
     subgraph Frontend
-        A[index.html<br/>Landing Page] --> B[Jinja2 Templates<br/>Dashboard · Inventory · Treatments · Logs]
+        B[Jinja2 Templates<br/>Dashboard · Inventory · Treatments · Logs · Map]
         B --> C[Tailwind CSS + Vanilla JS]
     end
 
     subgraph Backend
-        D[Flask — server.py<br/>Web App · Auth · CRUD]
-        E[FastAPI — api.py<br/>REST API · Usage Wizard]
+        D[Flask — server.py<br/>Web App · Auth · CRUD · CSRF]
+        R[reorder_ai.py<br/>Reorder Suggestion Engine]
     end
 
     subgraph AIViz["AI & Visualization"]
@@ -83,13 +83,13 @@ graph TB
     end
 
     subgraph Data
-        I[(SQLite<br/>13 Tables)]
+        I[(SQLite<br/>14 Tables)]
     end
 
     B --> D
-    A --> E
+    D --> R
     D --> I
-    E --> I
+    R --> I
     F --> I
     G --> I
     H --> I
@@ -109,14 +109,13 @@ graph TB
 <th align="left">Layer</th>
 <th align="left">Technology</th>
 </tr>
-<tr><td><b>Web Server</b></td><td>Flask + Jinja2</td></tr>
-<tr><td><b>REST API</b></td><td>FastAPI + Uvicorn + Pydantic</td></tr>
-<tr><td><b>AI</b></td><td>Google Gemini <code>google-generativeai</code></td></tr>
-<tr><td><b>ORM</b></td><td>SQLAlchemy</td></tr>
+<tr><td><b>Web Server</b></td><td>Flask + Jinja2 + Flask-WTF (CSRF)</td></tr>
+<tr><td><b>AI</b></td><td>Google Gemini <code>google-genai</code></td></tr>
+<tr><td><b>ORM</b></td><td>SQLAlchemy 2.x</td></tr>
 <tr><td><b>Database</b></td><td>SQLite</td></tr>
-<tr><td><b>Frontend</b></td><td>Tailwind CSS, vanilla JS</td></tr>
-<tr><td><b>Visualization</b></td><td>Streamlit, Plotly, Matplotlib</td></tr>
-<tr><td><b>GIS</b></td><td>Geopandas, Shapely, Folium</td></tr>
+<tr><td><b>Frontend</b></td><td>Tailwind CSS, vanilla JS, Jinja2</td></tr>
+<tr><td><b>Visualization</b></td><td>Streamlit, Plotly, Folium</td></tr>
+<tr><td><b>GIS</b></td><td>Geopandas, Shapely, pyogrio</td></tr>
 </table>
 
 ---
@@ -126,7 +125,6 @@ graph TB
 ### Prerequisites
 
 - Python 3.10+
-- Node.js 18+
 
 ### Installation
 
@@ -135,13 +133,11 @@ graph TB
 git clone https://github.com/Ishrat2110/fieldmind.git
 cd fieldmind
 
-# Install Python dependencies
-pip install flask fastapi uvicorn sqlalchemy werkzeug \
-    google-generativeai streamlit plotly geopandas shapely \
-    folium python-dotenv pydantic
+# (Recommended) create a virtual env
+python -m venv venv && source venv/bin/activate
 
-# Install Node dependencies
-npm install
+# Install dependencies
+pip install -r requirements.txt
 
 # Set up environment variables
 cp .env.example .env
@@ -168,7 +164,6 @@ python database.py
 | Service | Command | URL |
 |---------|---------|-----|
 | :globe_with_meridians: **Web App** | `python server.py` | `http://localhost:5001` |
-| :zap: **REST API** | `python api.py` | `http://localhost:8000` |
 | :brain: **AI Engine** | `streamlit run ai_engine.py` | `http://localhost:8501` |
 | :world_map: **Farm Map** | `streamlit run farm_map.py` | `http://localhost:8502` |
 | :satellite: **Shapefile Analyzer** | `streamlit run shapefile_analyzer.py` | `http://localhost:8503` |
@@ -184,7 +179,7 @@ python database.py
 
 ## :card_file_box: Database Schema
 
-13 tables organized into four domains:
+14 tables organized into four domains:
 
 ```
 Users & Access          Crops & Land             Inputs & Equipment       Tracking
@@ -203,18 +198,16 @@ farm_members           growth_stages                                     activit
 ```
 fieldmind/
 │
-├── server.py                  # Flask web app
-├── api.py                     # FastAPI REST endpoints
-├── models.py                  # SQLAlchemy models (13 tables)
+├── server.py                  # Flask web app (auth, CRUD, dashboard)
+├── models.py                  # SQLAlchemy models (14 tables)
 ├── database.py                # DB init + seed script
+├── reorder_ai.py              # Reorder suggestion engine
+├── seed_usage.py              # Extra usage data seeding
 │
 ├── ai_engine.py               # Gemini AI predictions (Streamlit)
 ├── farm_map.py                # Interactive plot map (Streamlit)
 ├── shapefile_analyzer.py      # GIS shapefile tool (Streamlit)
-├── seed_usage.py              # Extra usage data seeding
 │
-├── index.html                 # Frontend landing page
-├── landing.html               # Info page
 ├── templates/
 │   ├── base.html              # Sidebar layout
 │   ├── dashboard.html         # Main dashboard + charts
@@ -223,10 +216,14 @@ fieldmind/
 │   ├── log.html               # Usage logging form
 │   ├── history.html           # Usage history + export
 │   ├── login.html             # Authentication
+│   ├── map.html               # Plot map view
+│   ├── suggestions.html       # AI reorder suggestions
 │   └── users.html             # User management
 │
+├── tests/                     # pytest suite + smoke test
+├── docs/                      # Step-by-step design notes
+├── requirements.txt
 ├── Nebraska_N_RGB.png         # UNL brand mark
-├── Nebraska_N_RGB.svg
 └── .gitignore
 ```
 
